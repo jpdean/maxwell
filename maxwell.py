@@ -43,7 +43,7 @@ def f_sol(x):
     return out
 
 
-def solve(mesh_n, order):
+def solve(mesh_n, k, order):
     mesh = UnitCubeMesh(MPI.COMM_WORLD, mesh_n, mesh_n, mesh_n)
     mesh.topology.create_connectivity_all()
 
@@ -102,33 +102,46 @@ def solve(mesh_n, order):
     return L2_error, div_error
 
 
-# Wave number
-k = 2
-# Order (div error zero for first order due to divergence of
-# basis functions being zero)
-order = 1
+def convergence(k, order):
+    xs = []
+    ys = []
+    for i in range(2, 10):
+        if i % 2 == 0:
+            n = 2 ** (i // 2)
+        else:
+            n = 2 ** (i // 2) + 2 ** (i // 2 - 1)
+        xs.append(1 / n)
+        L2_error, div_error = solve(n, k, order)
+        ys.append(L2_error)
+        print_info(xs[-1], ys[-1], div_error)
 
-xs = []
-ys = []
-for i in range(2, 10):
-    if i % 2 == 0:
-        n = 2 ** (i // 2)
-    else:
-        n = 2 ** (i // 2) + 2 ** (i // 2 - 1)
-    xs.append(1 / n)
-    L2_error, div_error = solve(n, order)
-    ys.append(L2_error)
-    print(f"h = {xs[-1]}, L2-error = {ys[-1]}, Div-error = {div_error}")
+    r = np.log(ys[-1] / ys[-2]) / np.log(xs[-1] / xs[-2])
+    print(f"r = {r}")
 
-r = np.log(ys[-1] / ys[-2]) / np.log(xs[-1] / xs[-2])
-print(f"r = {r}")
+    plt.plot(xs, ys, "ro-")
+    plt.xscale("log")
+    plt.xlabel("$h$")
+    plt.yscale("log")
+    plt.ylabel("Error (L2 norm)")
+    plt.axis("equal")
+    plt.xlim(plt.xlim()[::-1])
+    plt.savefig("convergence.png")
+    plt.show()
 
-plt.plot(xs, ys, "ro-")
-plt.xscale("log")
-plt.xlabel("$h$")
-plt.yscale("log")
-plt.ylabel("Error (L2 norm)")
-plt.axis("equal")
-plt.xlim(plt.xlim()[::-1])
-plt.savefig("convergence.png")
-plt.show()
+
+def problem(n, k, order):
+    L2_error, div_error = solve(n, k, order)
+    print_info(1 / n, L2_error, div_error)
+
+
+def print_info(h, L2_error, div_error):
+    print(f"h = {h}, L2-error = {L2_error}, Div-error = {div_error}")
+
+if __name__ == "__main__":
+    # Wave number
+    k = 2
+    # Order (div error zero for first order due to divergence of
+    # basis functions being zero)
+    order = 1
+    # convergence(k, order)
+    problem(5, k, order)
