@@ -6,21 +6,22 @@ import pygmsh
 import numpy as np
 import pygmsh
 from mpi4py import MPI
-from dolfinx import cpp
+from dolfinx import cpp, solve
 from dolfinx.cpp.io import perm_gmsh, extract_local_entities
 from dolfinx.io import XDMFFile, ufl_mesh_from_gmsh
 from dolfinx.mesh import (create_mesh, create_meshtags, MeshTags,
                           locate_entities_boundary)
 import meshio
-from dolfinx import FunctionSpace, Function
+from dolfinx import FunctionSpace, Function, Constant
 from dolfinx.fem import DirichletBC, locate_dofs_topological
 import dolfinx
+from ufl import Measure, dot, grad, TrialFunction, TestFunction, inner
 
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
-outer =  geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=1)
-inner =  geom.add_disk([0.25, 0.25, 0.0], 0.3, char_length=0.75)
-frags = geom.boolean_fragments([outer], [inner])
+outer_disk =  geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=0.25)
+inner_disk =  geom.add_disk([0.25, 0.25, 0.0], 0.3, char_length=0.05)
+frags = geom.boolean_fragments([outer_disk], [inner_disk])
 # Outer
 geom.add_raw_code("Physical Surface(1) = {3};")
 # Inner
@@ -60,19 +61,36 @@ with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
 V = FunctionSpace(mesh, ("Lagrange", 1))
 
 
+# TODO Replace with meshtag
 def bound_marker(x):
     r = np.sqrt(x[0]**2 + x[1]**2)
     return np.isclose(r, 1.0) # TODO Don't hardcode
 
 u_bc = Function(V)
-with u_bc.vector.localForm() as loc:
-    loc.set(0.0)
+u_bc.vector.set(0.0)
 
 facets = locate_entities_boundary(mesh, 1, bound_marker)
 bdofs = locate_dofs_topological(V, 1, facets)
 bc = DirichletBC(u_bc, bdofs)
 
+mu = [1.26e-6, 4 * np.pi * 1e-7]
 
-# with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
-#     file.write_mesh(mesh)
-#     file.write_meshtags(mat_mt) # TODO Path needed?
+dx = Measure("dx", subdomain_data=mat_mt)
+
+J = Constant(mesh, 1.0)
+A_z = TrialFunction(V)
+v = TestFunction(V)
+
+# TODO Write as function / list comprehension and use loop
+a = (1 / mu[0]) * inner(grad(A_z), grad(v)) * dx(1) + \
+    (1 / mu[1]) * inner(grad(A_z), grad(v)) * dx(2)
+L = inner(J, v) * dx(1)
+
+
+A_z = Function(V)
+solve(a == L, A_z, bc, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+
+with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
+    file.write_mesh(mesh)
+    file.write_function(A_z)
+    # file.write_meshtags(mat_mt) # TODO Path needed?
