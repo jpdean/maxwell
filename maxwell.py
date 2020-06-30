@@ -47,7 +47,8 @@ def solve(mesh_n, k, order):
     mesh = UnitCubeMesh(MPI.COMM_WORLD, mesh_n, mesh_n, mesh_n)
     mesh.topology.create_connectivity_all()
 
-    V = FunctionSpace(mesh, ("N1curl", order))
+    # V = FunctionSpace(mesh, ("N1curl", order))
+    V = VectorFunctionSpace(mesh, ("CG", order))
 
     sol_V = VectorFunctionSpace(mesh, ("CG", order + 3))
     sol = Function(sol_V)
@@ -63,7 +64,7 @@ def solve(mesh_n, k, order):
     f = Function(V)
     f.vector.set(0.0)
 
-    a_form = inner(curl(u), curl(v)) * dx - k ** 2 * inner(u, v) * dx
+    a_form = inner(curl(u), curl(v)) * dx - k ** 2 * inner(u, v) * dx + 10 * inner(div(u), div(v)) * dx
     b_form = inner(f, v) * dx
 
     a = assemble_matrix(a_form, [bc])
@@ -105,7 +106,7 @@ def solve(mesh_n, k, order):
 def convergence(k, order):
     xs = []
     ys = []
-    for i in range(2, 10):
+    for i in range(2, 8):
         if i % 2 == 0:
             n = 2 ** (i // 2)
         else:
@@ -143,5 +144,7 @@ if __name__ == "__main__":
     # Order (div error zero for first order due to divergence of
     # basis functions being zero)
     order = 1
-    # convergence(k, order)
-    problem(5, k, order)
+    # Number of elements in each direction
+    n = 5
+    convergence(k, order)
+    # problem(n, k, order)
