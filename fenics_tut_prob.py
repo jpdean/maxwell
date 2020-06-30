@@ -1,6 +1,10 @@
-# Maxwell problem from the FEniCS tutorial:
+# Maxwell problem based on the FEniCS tutorial:
 # https://fenicsproject.org/pub/tutorial/html/._ftut1015.html#___sec104
 # Updated for dolfinx.
+
+# Solves for the magnetic field of a copper wire in a vacuum
+
+# FIXME Why does B not go to zero at the boundary?
 
 import pygmsh
 import numpy as np
@@ -22,7 +26,7 @@ import ufl
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
 outer_disk = geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=0.25)
-inner_disk = geom.add_disk([0.25, 0.25, 0.0], 0.3, char_length=0.05)
+inner_disk = geom.add_disk([0.0, 0.0, 0.0], 0.05, char_length=0.01)
 frags = geom.boolean_fragments([outer_disk], [inner_disk])
 # Outer
 geom.add_raw_code("Physical Surface(1) = {3};")
@@ -54,9 +58,9 @@ mat_mt = create_meshtags(mesh, 2, cpp.graph.AdjacencyList_int32(local_entities),
                      np.int32(local_values))
 mat_mt.name = "material"
 
-with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
-    file.write_mesh(mesh)
-    file.write_meshtags(mat_mt) # TODO Path needed?
+# with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
+#     file.write_mesh(mesh)
+#     file.write_meshtags(mat_mt) # TODO Path needed?
 
 # meshio.write("subdomains.vtu", pygmsh_mesh)
 
@@ -83,7 +87,7 @@ J = Constant(mesh, 1.0)
 A_z = TrialFunction(V)
 v = TestFunction(V)
 
-# TODO Write as function / list comprehension and use loop
+# TODO Write as function / list comprehension / use loop
 a = (1 / mu[0]) * inner(grad(A_z), grad(v)) * dx(1) + \
     (1 / mu[1]) * inner(grad(A_z), grad(v)) * dx(2)
 L = inner(J, v) * dx(1)
