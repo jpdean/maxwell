@@ -12,15 +12,17 @@ from dolfinx.io import XDMFFile, ufl_mesh_from_gmsh
 from dolfinx.mesh import (create_mesh, create_meshtags, MeshTags,
                           locate_entities_boundary)
 import meshio
-from dolfinx import FunctionSpace, Function, Constant
+from dolfinx import FunctionSpace, Function, Constant, VectorFunctionSpace
 from dolfinx.fem import DirichletBC, locate_dofs_topological
 import dolfinx
-from ufl import Measure, dot, grad, TrialFunction, TestFunction, inner
+from ufl import (Measure, dot, grad, TrialFunction, TestFunction, inner,
+                 as_vector)
+import ufl
 
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
-outer_disk =  geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=0.25)
-inner_disk =  geom.add_disk([0.25, 0.25, 0.0], 0.3, char_length=0.05)
+outer_disk = geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=0.25)
+inner_disk = geom.add_disk([0.25, 0.25, 0.0], 0.3, char_length=0.05)
 frags = geom.boolean_fragments([outer_disk], [inner_disk])
 # Outer
 geom.add_raw_code("Physical Surface(1) = {3};")
@@ -90,7 +92,23 @@ L = inner(J, v) * dx(1)
 A_z = Function(V)
 solve(a == L, A_z, bc, petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
 
-with XDMFFile(MPI.COMM_WORLD, "mesh.xdmf", "w") as file:
+with XDMFFile(MPI.COMM_WORLD, "A_z.xdmf", "w") as file:
     file.write_mesh(mesh)
     file.write_function(A_z)
-    # file.write_meshtags(mat_mt) # TODO Path needed?
+
+
+# TODO Is there a better way? Is the project needed?
+W = VectorFunctionSpace(mesh, ("Lagrange", 1))
+B = TrialFunction(W)
+v = TestFunction(W)
+f = as_vector((A_z.dx(1), -A_z.dx(0)))
+
+a = inner(B, v) * ufl.dx
+L = inner(f, v) * ufl.dx
+
+B = Function(W)
+solve(a == L, B, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+
+with XDMFFile(MPI.COMM_WORLD, "B.xdmf", "w") as file:
+    file.write_mesh(mesh)
+    file.write_function(B)
