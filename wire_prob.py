@@ -23,15 +23,35 @@ from ufl import (Measure, dot, grad, TrialFunction, TestFunction, inner,
                  as_vector)
 import ufl
 
+a = 1.0   # inner radius of iron cylinder
+b = 1.2   # outer radius of iron cylinder
+c_1 = 0.8 # radius for inner circle of copper wires
+c_2 = 1.4 # radius for outer circle of copper wires
+r = 0.1   # radius of copper wires
+R = 5.0   # radius of domain
+n = 10    # number of windings
+
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
-outer_disk = geom.add_disk([0.0, 0.0, 0.0], 1.0, char_length=0.25)
-inner_disk = geom.add_disk([0.0, 0.0, 0.0], 0.05, char_length=0.01)
-frags = geom.boolean_fragments([outer_disk], [inner_disk])
-# Mark outer as 1
-geom.add_raw_code("Physical Surface(1) = {3};")
-# Mark inner as 2
-geom.add_raw_code("Physical Surface(2) = {2};")
+domain = geom.add_disk([0.0, 0.0, 0.0], R, char_length=0.25)
+thetas_up = [i * 2 * np.pi / n for i in range(n)]
+wires_up = [geom.add_disk([c_1 * np.cos(theta), c_1 * np.sin(theta), 0.0],
+            r, char_length=0.05) for theta in thetas_up]
+thetas_down = [(i + 0.5) * 2 * np.pi / n for i in range(n)]
+wires_down = [geom.add_disk([c_2 * np.cos(theta), c_2 * np.sin(theta), 0.0],
+              r, char_length=0.05) for theta in thetas_down]
+wires = wires_up + wires_down
+frags = geom.boolean_fragments([domain], wires)
+# Calculate GMSH surface ID number for vacuum region (i.e. region that's).
+# This formula works since (I think) the initial domain disk is numbered 1,
+# then 2 * n disks are created for the wires with surfaces numbered 2 through
+# 2 * n + 1, then the final surface is created consisting of the domain minus
+# the wires, and therefore numbered 2 * n + 2  
+vac_surf_id = 2 * n + 2
+geom.add_raw_code("Physical Surface(1) = {" + str(vac_surf_id) + "};")
+# For the wires, we can just use pygmsh's add_physical method
+geom.add_physical(wires_up, 2)
+geom.add_physical(wires_down, 3)
 # print(geom.get_code())
 pygmsh_mesh = pygmsh.generate_mesh(geom)
 
@@ -39,14 +59,16 @@ pygmsh_mesh = pygmsh.generate_mesh(geom)
 x = np.array([pt[0:2] for pt in pygmsh_mesh.points])
 
 # Cells
-inner_cells = pygmsh_mesh.cells[0].data
-outer_cells = pygmsh_mesh.cells[1].data
-cells = np.vstack((inner_cells, outer_cells))
+# pygmsh_mesh.cells[i].data contains list of cells in the ith surface
+# (i.e. for n turns, we have 2n circles and the vacuum space, 
+# so len(pygmsh_mesh.cells) = 2n + 1).
+# Need to collect these all together to create a dolfin mesh.
+cells = np.vstack([cells.data for cells in pygmsh_mesh.cells])
 
 # Cell values
-inner_cell_values = pygmsh_mesh.cell_data["gmsh:physical"][0]
-outer_cell_values = pygmsh_mesh.cell_data["gmsh:physical"][1]
-values = np.hstack((inner_cell_values, outer_cell_values))
+# Do the same as above for the cell values, combining into one.
+values = np.hstack([cell_data for cell_data in 
+                    pygmsh_mesh.cell_data["gmsh:physical"]])
 
 mesh = create_mesh(MPI.COMM_WORLD, cells, x, ufl_mesh_from_gmsh("triangle", 2))
 mesh.name = "wire"
@@ -70,7 +92,7 @@ V = FunctionSpace(mesh, ("Lagrange", 1))
 # TODO Replace with meshtag
 def bound_marker(x):
     r = np.sqrt(x[0]**2 + x[1]**2)
-    return np.isclose(r, 1.0) # TODO Don't hardcode
+    return np.isclose(r, R)
 
 u_bc = Function(V)
 u_bc.vector.set(0.0)
@@ -86,13 +108,14 @@ J = Constant(mesh, 1.0)
 A_z = TrialFunction(V)
 v = TestFunction(V)
 
-# Vacuum marked as 1, copper wire marked as 2
+# Vacuum marked as 1, wires up marked as 2, wires down marked as 3
 dx = Measure("dx", subdomain_data=mat_mt)
 
 # TODO Write as function / list comprehension / use loop
 a = (1 / mu_vacuum) * inner(grad(A_z), grad(v)) * dx(1) + \
-    (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(2)
-L = inner(J, v) * dx(2)
+    (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(2) + \
+    (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(3)
+L = inner(J, v) * dx(2) - inner(J, v) * dx(3)
 
 
 A_z = Function(V)
@@ -103,7 +126,7 @@ with XDMFFile(MPI.COMM_WORLD, "A_z.xdmf", "w") as file:
     file.write_function(A_z)
 
 
-# TODO Is there a better way? Is the project needed?
+# TODO Is there a better way? Is the project needed? What space?
 W = VectorFunctionSpace(mesh, ("Lagrange", 1))
 B = TrialFunction(W)
 v = TestFunction(W)
