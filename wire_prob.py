@@ -31,18 +31,23 @@ r = 0.1   # radius of copper wires
 R = 5.0   # radius of domain
 n = 10    # number of windings
 
+# Characteristic element sizes
+h_domain = 0.25
+h_iron = 0.05
+h_wire = 0.05
+
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
-domain = geom.add_disk([0.0, 0.0, 0.0], R, char_length=0.25)
-inner_iron = geom.add_disk([0.0, 0.0, 0.0], a, char_length=0.1)
-outer_iron = geom.add_disk([0.0, 0.0, 0.0], b, char_length=0.1)
+domain = geom.add_disk([0.0, 0.0, 0.0], R, char_length=h_domain)
+inner_iron = geom.add_disk([0.0, 0.0, 0.0], a, char_length=h_iron)
+outer_iron = geom.add_disk([0.0, 0.0, 0.0], b, char_length=h_iron)
 iron = geom.boolean_difference([outer_iron], [inner_iron])
 thetas_up = [i * 2 * np.pi / n for i in range(n)]
 wires_up = [geom.add_disk([c_1 * np.cos(theta), c_1 * np.sin(theta), 0.0],
-            r, char_length=0.05) for theta in thetas_up]
+            r, char_length=h_wire) for theta in thetas_up]
 thetas_down = [(i + 0.5) * 2 * np.pi / n for i in range(n)]
 wires_down = [geom.add_disk([c_2 * np.cos(theta), c_2 * np.sin(theta), 0.0],
-              r, char_length=0.05) for theta in thetas_down]
+              r, char_length=h_wire) for theta in thetas_down]
 # Concatenate arrays
 wires = wires_up + wires_down
 frags = geom.boolean_fragments([domain], wires + [iron])
