@@ -34,24 +34,29 @@ n = 10    # number of windings
 # FIXME This will generate on each process
 geom = pygmsh.opencascade.Geometry()
 domain = geom.add_disk([0.0, 0.0, 0.0], R, char_length=0.25)
+inner_iron = geom.add_disk([0.0, 0.0, 0.0], a, char_length=0.1)
+outer_iron = geom.add_disk([0.0, 0.0, 0.0], b, char_length=0.1)
+iron = geom.boolean_difference([outer_iron], [inner_iron])
 thetas_up = [i * 2 * np.pi / n for i in range(n)]
 wires_up = [geom.add_disk([c_1 * np.cos(theta), c_1 * np.sin(theta), 0.0],
             r, char_length=0.05) for theta in thetas_up]
 thetas_down = [(i + 0.5) * 2 * np.pi / n for i in range(n)]
 wires_down = [geom.add_disk([c_2 * np.cos(theta), c_2 * np.sin(theta), 0.0],
               r, char_length=0.05) for theta in thetas_down]
+# Concatenate arrays
 wires = wires_up + wires_down
-frags = geom.boolean_fragments([domain], wires)
-# Calculate GMSH surface ID number for vacuum region (i.e. region that's).
-# This formula works since (I think) the initial domain disk is numbered 1,
-# then 2 * n disks are created for the wires with surfaces numbered 2 through
-# 2 * n + 1, then the final surface is created consisting of the domain minus
-# the wires, and therefore numbered 2 * n + 2  
-vac_surf_id = 2 * n + 2
-geom.add_raw_code("Physical Surface(1) = {" + str(vac_surf_id) + "};")
-# For the wires, we can just use pygmsh's add_physical method
+frags = geom.boolean_fragments([domain], wires + [iron])
+# Calculate GMSH surface ID number for vacuum region.
+# Formula found by outputting gmsh code (geom.get_code()) and
+# running interactively with gmsh to see how it numbers things.
+vac_surf_id = 2 * n + 4
+geom.add_raw_code("Physical Surface(1) = {" +
+                   str(vac_surf_id) + ", " +
+                   str(vac_surf_id + 1) + "};")
+# For the wires and iron, we can just use pygmsh's add_physical method
 geom.add_physical(wires_up, 2)
 geom.add_physical(wires_down, 3)
+geom.add_physical(iron, 4)
 # print(geom.get_code())
 pygmsh_mesh = pygmsh.generate_mesh(geom)
 
@@ -103,6 +108,10 @@ bc = DirichletBC(u_bc, bdofs)
 
 mu_vacuum = 4 * np.pi * 1e-7
 mu_copper = 1.26e-6
+# Using lower value than iron's actual value of 6.3e-3 as is done
+# in FEniCS tutorial. This is so the field in the iron doesn't
+# dominate the solution as much, making it more interesting.
+mu_iron = 1e-5
 
 J = Constant(mesh, 1.0)
 A_z = TrialFunction(V)
@@ -114,7 +123,8 @@ dx = Measure("dx", subdomain_data=mat_mt)
 # TODO Write as function / list comprehension / use loop
 a = (1 / mu_vacuum) * inner(grad(A_z), grad(v)) * dx(1) + \
     (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(2) + \
-    (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(3)
+    (1 / mu_copper) * inner(grad(A_z), grad(v)) * dx(3) + \
+    (1 / mu_iron) * inner(grad(A_z), grad(v)) * dx(4)
 L = inner(J, v) * dx(2) - inner(J, v) * dx(3)
 
 
