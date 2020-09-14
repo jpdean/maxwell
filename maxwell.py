@@ -11,6 +11,7 @@ from dolfinx.fem import (apply_lifting, locate_dofs_topological, set_bc,
                          assemble_matrix, assemble_vector, assemble_scalar)
 from ufl import dx, inner, curl, div
 import matplotlib.pylab as plt
+from dolfinx.io import XDMFFile
 
 
 def l2_projection(space, f, f_order=1):
@@ -47,7 +48,7 @@ def solve(mesh_n, k, order):
     mesh = UnitCubeMesh(MPI.COMM_WORLD, mesh_n, mesh_n, mesh_n)
     mesh.topology.create_connectivity_all()
 
-    V = FunctionSpace(mesh, ("N1curl", order))
+    V = FunctionSpace(mesh, ("N2curl", order))
 
     sol_V = VectorFunctionSpace(mesh, ("CG", order + 3))
     sol = Function(sol_V)
@@ -99,32 +100,51 @@ def solve(mesh_n, k, order):
         inner(u - sol, u - sol) * dx), op=MPI.SUM)))
     div_error = np.real(np.sqrt(mesh.mpi_comm().allreduce(assemble_scalar(
         inner(div(u), div(u)) * dx), op=MPI.SUM)))
+
+    # # Save solution to XDMF format
+    # with XDMFFile(MPI.COMM_WORLD, "u.xdmf", "w") as file:
+    #     file.write_mesh(mesh)
+    #     file.write_function(u)
+    # # Exact solution
+    # with XDMFFile(MPI.COMM_WORLD, "u_e.xdmf", "w") as file:
+    #     file.write_mesh(mesh)
+    #     file.write_function(sol)
+    
     return L2_error, div_error
 
-
-def convergence(k, order):
-    xs = []
-    ys = []
-    for i in range(2, 10):
-        if i % 2 == 0:
-            n = 2 ** (i // 2)
+# FIXME This is a terrible way of doing it.
+def convergence(k, orders):
+    for order in orders:
+        xs = []
+        ys = []
+        if order == 1:
+            rng = [2, 10]
+        elif order == 2:
+            rng = [2, 8]
         else:
-            n = 2 ** (i // 2) + 2 ** (i // 2 - 1)
-        xs.append(1 / n)
-        L2_error, div_error = solve(n, k, order)
-        ys.append(L2_error)
-        print_info(xs[-1], ys[-1], div_error)
+            rng = [2, 5]
+        for i in range(rng[0], rng[1]):
+            if i % 2 == 0:
+                n = 2 ** (i // 2)
+            else:
+                n = 2 ** (i // 2) + 2 ** (i // 2 - 1)
+            xs.append(1 / n)
+            L2_error, div_error = solve(n, k, order)
+            ys.append(L2_error)
+            print_info(xs[-1], ys[-1], div_error)
 
-    r = np.log(ys[-1] / ys[-2]) / np.log(xs[-1] / xs[-2])
-    print(f"r = {r}")
+        r = np.log(ys[-1] / ys[-2]) / np.log(xs[-1] / xs[-2])
+        print(f"r = {r}")
 
-    plt.plot(xs, ys, "ro-")
+        plt.plot(xs, ys, "-x", label=order)
     plt.xscale("log")
     plt.xlabel("$h$")
     plt.yscale("log")
-    plt.ylabel("Error (L2 norm)")
-    plt.axis("equal")
+    plt.ylabel("Error")
+    # plt.axis("equal")
     plt.xlim(plt.xlim()[::-1])
+    # plt.xlim(0.01, 1)
+    plt.legend(title="Order")
     plt.savefig("convergence.png")
     plt.show()
 
@@ -143,5 +163,5 @@ if __name__ == "__main__":
     # Order (div error zero for first order due to divergence of
     # basis functions being zero)
     order = 1
-    # convergence(k, order)
-    problem(5, k, order)
+    convergence(k, [1, 2, 3])
+    # problem(15, k, order)
