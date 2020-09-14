@@ -1,5 +1,6 @@
 # Maxwell Dirichlet problem based on Matthew's RR convergence demo.
 # FIXME Does not give correct convergence results in parallel.
+# See "Finite Element Methods for Maxwell's Equations" by Monk and Zhang
 
 import numpy as np
 from mpi4py import MPI
