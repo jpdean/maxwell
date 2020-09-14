@@ -55,6 +55,8 @@ frags = geom.boolean_fragments([domain], wires + [iron])
 # Formula found by outputting gmsh code (geom.get_code()) and
 # running interactively with gmsh to see how it numbers things.
 vac_surf_id = 2 * n + 4
+# TODO See eddy current vector potential code for how to do this without
+# adding raw code.
 geom.add_raw_code("Physical Surface(1) = {" +
                    str(vac_surf_id) + ", " +
                    str(vac_surf_id + 1) + "};")
