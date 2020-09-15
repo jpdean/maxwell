@@ -11,13 +11,14 @@ from dolfinx import (FunctionSpace, Function, Constant, solve,
                      VectorFunctionSpace)
 import ufl
 from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
+from dolfinx.fem.assemble import assemble_scalar
 
 h = 0.01
 freq = 0.01
 omega = 2 * np.pi * freq
 mu_0 = 4 * np.pi * 1e-7
 mu_r_iron = 5000
-J_s = 1
+J_s = 100
 sigma_iron = 1e7
 
 # TODO Remove magic numbers
@@ -144,3 +145,8 @@ while t < T:
     solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
     J_e.vector.copy(result=J_e_sol.vector)
     file.write_function(J_e_sol, t)
+
+# NOTE Inner takes complex conjugate of secon argument, so no need to e.g. get magnitude
+# pg 244 of Bastos and Sadowski
+ave_power = omega**2 / 2 * mesh.mpi_comm().allreduce(assemble_scalar(sigma_iron * inner(A_z, A_z) * dx(4)), op=MPI.SUM)
+print(f"Average power loss = {ave_power} W")
