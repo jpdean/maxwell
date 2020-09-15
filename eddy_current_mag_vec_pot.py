@@ -1,3 +1,7 @@
+# NOTE 2D solver therefore magnetic vector potential only has a single
+# component in the z direction, called A in the code. The B field lies
+# in the 2D plane. The current density has only a z component.
+
 import pygmsh
 import numpy as np
 from dolfinx.mesh import (create_mesh, create_meshtags,
@@ -21,11 +25,10 @@ from dolfinx.fem.assemble import assemble_scalar
 #     by Bastos and Sadowski
 
 class Problem:
-    def __init__(self, h, freq, J_s, k):
+    def __init__(self, h, freq, k):
         self.h = h
         # Frequency (Hz)
         self.freq = freq
-        self.J_s = J_s
         self.k = k
         self.mesh, self.mat_mt = self.create_mesh()
 
@@ -38,11 +41,11 @@ class Problem:
     def bound_cond(self, x):
         return None
 
+    def get_mat_dict(self):
+        return None
+
 
 class Prob1(Problem):
-    def __init__(self, h, freq, J_s, k):
-        super().__init__(h, freq, J_s, k)
-
     def create_mesh(self):
         # TODO Remove magic numbers
         geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
@@ -56,7 +59,8 @@ class Prob1(Problem):
         upper_c2 = geom.add_rectangle([0.55, 0.8, 0], 0.35, 0.2)
         mid_c2 = geom.add_rectangle([0.7, 0, 0], 0.2, 1.0)
         c2 = geom.boolean_union([lower_c2, upper_c2, mid_c2])
-        airgap = geom.boolean_difference([domain], [c, c2, coil], delete_other=False)
+        airgap = geom.boolean_difference([domain], [c, c2, coil],
+                                         delete_other=False)
         geom.boolean_fragments([airgap], [c, c2, coil])
         geom.add_physical(airgap, 1)
         geom.add_physical(c, 2)
@@ -100,17 +104,50 @@ class Prob1(Problem):
         values = np.zeros((1, x.shape[1]))
         return values
 
+    def get_mat_dict(self):
+        air_mat_prop = MatProp(name="Air",
+                               mu=4 * np.pi * 1e-7,
+                               sigma=None,
+                               J_s=None)
+        # Laminated -> low conductance -> set sigma to None to not
+        # include integral
+        laminated_iron_mat_prop = MatProp(name="Laminated iron",
+                                          mu=6.3e-3,
+                                          sigma=None,
+                                          J_s=None)
+        # We prescrive the total current in the coil (with J_s), so sigma set
+        # to None
+        coil_mat_prop = MatProp(name="Coil",
+                                mu=1.3e-6,
+                                sigma=None,
+                                J_s=100)
+        iron_mat_prop = MatProp(name="Iron",
+                                mu=6.3e-3,
+                                sigma=1e7,
+                                J_s=None)
+
+        mat_dict = {1: air_mat_prop,
+                    2: laminated_iron_mat_prop,
+                    3: coil_mat_prop,
+                    4: iron_mat_prop}
+        return mat_dict
+
+
+class MatProp:
+    def __init__(self, name, mu, sigma, J_s):
+        self.name = name
+        self.mu = mu
+        self.sigma = sigma
+        self.J_s = J_s
+
 
 def solver(problem):
     mesh = problem.mesh
     mat_mt = problem.mat_mt
     k = problem.k
+    # TODO Make the problem compute this
     omega = 2 * np.pi * problem.freq
-    J_s = problem.J_s
-
-    mu_0 = 4 * np.pi * 1e-7
-    mu_r_iron = 5000
-    sigma_iron = 1e7
+    mat_dict = problem.get_mat_dict()
 
     V = FunctionSpace(mesh, ("Lagrange", k))
 
@@ -120,20 +157,27 @@ def solver(problem):
     bdofs = locate_dofs_topological(V, 1, facets)
     bc = DirichletBC(A_bc, bdofs)
 
-    # TODO Could remove assumption of J being constant.
-    J = Constant(mesh, J_s)
-
     A = TrialFunction(V)
     v = TestFunction(V)
 
     dx = Measure("dx", subdomain_data=mat_mt)
 
-    a = (1 / mu_0) * inner(grad(A), grad(v)) * dx(1) \
-        + (1 / mu_0) * inner(grad(A), grad(v)) * dx(3) \
-        + (1 / (mu_r_iron * mu_0)) * inner(grad(A), grad(v)) * dx(2) \
-        + (1 / (mu_r_iron * mu_0)) * inner(grad(A), grad(v)) * dx(4) \
-        - sigma_iron * 1j * omega * inner(A, v) * dx(4)
-    L = inner(J, v) * dx(3)
+    a_integral_list = []
+    L_integral_list = []
+    for index, mat_prop in mat_dict.items():
+        if mat_prop.mu is not None:
+            a_integral_list.append(
+                (1 / mat_prop.mu) * inner(grad(A), grad(v)) * dx(index))
+        if mat_prop.sigma is not None:
+            a_integral_list.append(
+                - mat_prop.sigma * 1j * omega * inner(A, v) * dx(index))
+        if mat_prop.J_s is not None:
+            # TODO Could easily remove assumption of J being constant.
+            J_s = Constant(mesh, mat_prop.J_s)
+            L_integral_list.append(inner(J_s, v) * dx(index))
+
+    a = sum(a_integral_list)
+    L = sum(L_integral_list)
 
     A = Function(V)
     solve(a == L, A, bc, petsc_options={"ksp_type": "preonly",
@@ -247,11 +291,10 @@ def compute_ave_power_loss(A, problem):
 if __name__ == "__main__":
     h = 0.01
     freq = 0.01
-    J_s = 100
     k = 2
 
     print("A")
-    problem = Prob1(h, freq, J_s, k)
+    problem = Prob1(h, freq, k)
     A = solver(problem)
     save(A, problem, "A.xdmf", time_series=False)
 
