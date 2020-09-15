@@ -11,7 +11,7 @@ from dolfinx import (FunctionSpace, Function, Constant, solve,
                      VectorFunctionSpace)
 import ufl
 from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
-                 as_vector, real)
+                 as_vector)
 from dolfinx.fem.assemble import assemble_scalar
 
 
@@ -189,11 +189,18 @@ def compute_J_e_from_A(A, problem):
     return J_e
 
 
+# When time_series = True:
 # The actual source current is given by Re(J_s e^{i \omega t}) (see [1] pg
 # 242). Other quantities can be obtaineed from A, B, J_e etc. in the same
 # manner. Note that the phase angle of J_s it taken to be zero (i.e. the
 # reference).
+# NOTE Only the real part of the time_series field is of physical
+# significance
 def save(v, problem, file_name, n=100, time_series=False):
+    """Saves results. If time_series=False, the saved results is a complex
+       phasor. If time_series=True, then the real part of the saved date
+       is the time dependent field.
+    """
     if not time_series:
         with XDMFFile(MPI.COMM_WORLD, file_name, "w") as file:
             file.write_mesh(problem.mesh)
@@ -214,7 +221,9 @@ def save(v, problem, file_name, n=100, time_series=False):
         v_out = Function(V)
 
         while t < T:
-            f = real(v * ufl.exp(1j * omega * t))
+            # Originally I used ufl.real to get the real part only, but for
+            # some reason this breaks project for vector fields. Not sure why.
+            f = v * ufl.exp(1j * omega * t)
             v_eval_at_t = project(f, V)
             v_eval_at_t.vector.copy(result=v_out.vector)
             out_file.write_function(v_out, t)
@@ -239,7 +248,7 @@ if __name__ == "__main__":
 
     print("B")
     B = compute_B_from_A(A, problem)
-    save(B, problem, "B.xdmf", time_series=True)
+    save(B, problem, "B.xdmf", time_series=False)
 
     print("J_e")
     J_e = compute_J_e_from_A(A, problem)
