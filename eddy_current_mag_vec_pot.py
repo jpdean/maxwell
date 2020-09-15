@@ -25,8 +25,6 @@ from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
 from dolfinx.fem.assemble import assemble_scalar
 
 
-# TODO Add page numbers for equations
-
 class Problem:
     def __init__(self, h, freq, k):
         self.h = h
@@ -95,13 +93,13 @@ class Prob1(Problem):
         return mesh, mat_mt
 
     def boundary_marker(self, x):
-        l = np.isclose(x[0], 0)
-        r = np.isclose(x[0], 1)
-        b = np.isclose(x[1], 0)
-        t = np.isclose(x[1], 1.1)
+        left = np.isclose(x[0], 0)
+        right = np.isclose(x[0], 1)
+        bottom = np.isclose(x[1], 0)
+        top = np.isclose(x[1], 1.1)
 
-        l_r = np.logical_or(l, r)
-        b_t = np.logical_or(b, t)
+        l_r = np.logical_or(left, right)
+        b_t = np.logical_or(bottom, top)
         l_r_b_t = np.logical_or(l_r, b_t)
         return l_r_b_t
 
@@ -151,7 +149,6 @@ def solver(problem):
     mesh = problem.mesh
     mat_mt = problem.mat_mt
     k = problem.k
-    # TODO Make the problem compute this
     omega = problem.calc_omega()
     mat_dict = problem.get_mat_dict()
 
@@ -215,8 +212,8 @@ def compute_B_from_A(A, problem):
 
 
 def compute_J_e_from_A(A, problem):
-    # FIXME Make this use project functoin once material properties have
-    # been added
+    # TODO Would be nice if this could use the project function.
+    # The RHS integral makes it slightly more clumsy
     V = FunctionSpace(problem.mesh,
                       ("Lagrange", problem.k))
     J_e = TrialFunction(V)
@@ -243,9 +240,8 @@ def compute_J_e_from_A(A, problem):
     return J_e
 
 
-# When time_series = True:
 # The actual source current is given by Re(J_s e^{i \omega t}) (see [1] pg
-# 242). Other quantities can be obtaineed from A, B, J_e etc. in the same
+# 242). Other quantities can be obtained from A, B, J_e etc. in the same
 # manner. Note that the phase angle of J_s it taken to be zero (i.e. the
 # reference).
 # NOTE Only the real part of the time_series field is of physical
@@ -275,8 +271,9 @@ def save(v, problem, file_name, n=100, time_series=False):
         v_out = Function(V)
 
         while t < T:
-            # Originally I used ufl.real to get the real part only, but for
+            # NOTE Originally I used ufl.real to get the real part only, but for
             # some reason this breaks project for vector fields. Not sure why.
+            # NOTE See [1] pg 242
             f = v * ufl.exp(1j * omega * t)
             v_eval_at_t = project(f, V)
             v_eval_at_t.vector.copy(result=v_out.vector)
