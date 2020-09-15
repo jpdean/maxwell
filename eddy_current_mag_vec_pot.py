@@ -52,6 +52,7 @@ class Problem:
 class Prob1(Problem):
     def create_mesh(self):
         # TODO Remove magic numbers
+        h = self.h
         geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
         domain = geom.add_rectangle([0, 0, 0], 1, 1.1)
         lower_c = geom.add_rectangle([0, 0, 0], 0.5, 0.2)
@@ -134,6 +135,126 @@ class Prob1(Problem):
                     2: laminated_iron_mat_prop,
                     3: coil_mat_prop,
                     4: iron_mat_prop}
+        return mat_dict
+
+
+class Prob2(Problem):
+    def create_mesh(self):
+        h = self.h
+
+        r1 = 0.02
+        r2 = 0.03
+        r3 = 0.032
+        r4 = 0.052
+        r5 = 0.057
+
+        geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
+        outer_stator = geom.add_disk([0.0, 0.0, 0.0], r5)
+        inner_stator = geom.add_disk([0.0, 0.0, 0.0], r4)
+        stator = geom.boolean_difference([outer_stator], [inner_stator],
+                                         delete_other=False)
+
+        coil_height = r1
+        coil_width = r5 - r1
+        right_coil = geom.add_rectangle([r1, - coil_height / 2, 0],
+                                        coil_width, coil_height)
+        right_coil = geom.boolean_intersection([inner_stator, right_coil],
+                                               delete_first=False)
+        geom.boolean_fragments([right_coil], [stator])
+        air_gap_circ = geom.add_disk([0.0, 0.0, 0.0], r3)
+        right_coil = geom.boolean_difference([right_coil], [air_gap_circ],
+                                             delete_other=False)
+
+        left_coil = geom.add_rectangle([- r1, - coil_height / 2, 0],
+                                       - coil_width, coil_height)
+        left_coil = geom.boolean_intersection([inner_stator, left_coil],
+                                              delete_first=False)
+        geom.boolean_fragments([left_coil], [stator])
+        left_coil = geom.boolean_difference([left_coil], [air_gap_circ])
+
+        outer_rotor = geom.add_disk([0.0, 0.0, 0.0], r2)
+        rotor_steel = geom.add_disk([0.0, 0.0, 0.0], r1)
+        rotor_al = geom.boolean_difference([outer_rotor], [rotor_steel],
+                                           delete_other=False)
+        air = geom.boolean_difference(
+            [inner_stator],
+            [left_coil, right_coil, rotor_al, rotor_steel], delete_other=False)
+
+        geom.add_physical(air, 1)
+        geom.add_physical(stator, 2)
+        geom.add_physical(rotor_al, 3)
+        geom.add_physical(rotor_steel, 4)
+        geom.add_physical(left_coil, 5)
+        geom.add_physical(right_coil, 6)
+
+        pygmsh_mesh = pygmsh.generate_mesh(geom)
+
+        # Prune z, probably a better way to do this (see generate mesh options)
+        x = np.array([pt[0:2] for pt in pygmsh_mesh.points])
+
+        cells = np.vstack([cells.data for cells in pygmsh_mesh.cells])
+        values = np.hstack([cell_data for cell_data in
+                            pygmsh_mesh.cell_data["gmsh:physical"]])
+
+        mesh = create_mesh(MPI.COMM_WORLD, cells, x,
+                           ufl_mesh_from_gmsh("triangle", 2))
+
+        local_entities, local_values = \
+            extract_local_entities(mesh, 2, cells, values)
+        # TODO Create connectivity?
+
+        mat_mt = create_meshtags(mesh, 2,
+                                 AdjacencyList_int32(local_entities),
+                                 np.int32(local_values))
+        return mesh, mat_mt
+
+    def boundary_marker(self, x):
+        # TODO Don't hardcode radius
+        r5 = 0.057
+        r = np.sqrt(x[0]**2 + x[1]**2)
+        return np.isclose(r, r5)
+
+    def bound_cond(self, x):
+        # TODO Make this use meshtags
+        values = np.zeros((1, x.shape[1]))
+        return values
+
+    def get_mat_dict(self):
+        air_mat_prop = MatProp(name="Air",
+                               mu=4 * np.pi * 1e-7,
+                               sigma=None,
+                               J_s=None)
+        # Laminated -> low conductance -> set sigma to None to not
+        # include integral
+        laminated_iron_mat_prop = MatProp(name="Laminated iron",
+                                          mu=6.3e-3,
+                                          sigma=None,
+                                          J_s=None)
+        # We prescrive the total current in the coil (with J_s), so sigma set
+        # to None
+        right_coil_mat_prop = MatProp(name="Right Coil",
+                                      mu=1.3e-6,
+                                      sigma=None,
+                                      J_s=3.1e6)
+        left_coil_mat_prop = MatProp(name="Left Coil",
+                                     mu=1.3e-6,
+                                     sigma=None,
+                                     J_s=-3.1e6)
+        alu_mat_prop = MatProp(name="Aluminium",
+                               mu=1.23e-6,
+                               sigma=3.77e7,
+                               J_s=None)
+        iron_mat_prop = MatProp(name="Iron",
+                                mu=6.3e-3,
+                                sigma=1e7,
+                                J_s=None)
+
+        mat_dict = {1: air_mat_prop,
+                    2: laminated_iron_mat_prop,
+                    3: alu_mat_prop,
+                    4: iron_mat_prop,
+                    5: left_coil_mat_prop,
+                    6: right_coil_mat_prop}
         return mat_dict
 
 
@@ -303,12 +424,12 @@ def compute_ave_power_loss(A, problem):
 
 
 if __name__ == "__main__":
-    h = 0.01
-    freq = 0.01
+    h = 0.001
+    freq = 1
     k = 2
 
     print("A")
-    problem = Prob1(h, freq, k)
+    problem = Prob2(h, freq, k)
     A = solver(problem)
     save(A, problem, "A.xdmf", time_series=False)
 
