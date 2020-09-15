@@ -11,7 +11,7 @@ from dolfinx import (FunctionSpace, Function, Constant, solve,
                      VectorFunctionSpace)
 import ufl
 from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
-                 as_vector)
+                 as_vector, real)
 from dolfinx.fem.assemble import assemble_scalar
 
 
@@ -229,10 +229,19 @@ def save(v, problem, file_name, n=100, time_series=False):
             out_file.write_function(v_out, t)
             t += delta_t
 
-    # # NOTE Inner takes complex conjugate of secon argument, so no need to e.g. get magnitude
-    # # pg 244 of Bastos and Sadowski
-    # ave_power = omega**2 / 2 * mesh.mpi_comm().allreduce(assemble_scalar(sigma_iron * inner(A_z, A_z) * dx(4)), op=MPI.SUM)
-    # print(f"Average power loss = {ave_power} W")
+
+# From pg 244 of [1]
+def compute_ave_power_loss(A, problem):
+    omega = 2 * np.pi * problem.freq
+    # FIXME Pass region to integrate and material properties
+    sigma_iron = 1e7
+    # NOTE Inner takes complex conjugate of secon argument, so no need
+    # to e.g. get magnitude
+    dx = Measure("dx", subdomain_data=problem.mat_mt)
+    ave_power_loss = omega**2 / 2 * problem.mesh.mpi_comm().allreduce(
+        assemble_scalar(sigma_iron * inner(A, A) * dx(4)), op=MPI.SUM)
+    # This will only have a real component so take that
+    return real(ave_power_loss)
 
 
 if __name__ == "__main__":
@@ -253,3 +262,6 @@ if __name__ == "__main__":
     print("J_e")
     J_e = compute_J_e_from_A(A, problem)
     save(J_e, problem, "J_e.xdmf", time_series=False)
+
+    ave_power_loss = compute_ave_power_loss(A, problem)
+    print(f"Average power loss = {ave_power_loss} W")
