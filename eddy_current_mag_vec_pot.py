@@ -208,7 +208,6 @@ def compute_B_from_A(A, problem):
     # TODO Is there a better way?
     V = VectorFunctionSpace(problem.mesh,
                             ("Discontinuous Lagrange", problem.k - 1))
-    A_vec = as_vector((0, 0, A))
     # See [2]
     f = as_vector((A.dx(1), - A.dx(0)))
     B = project(f, V)
