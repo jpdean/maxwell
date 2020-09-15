@@ -14,6 +14,7 @@ from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
 
 h = 0.025
 
+# TODO Remove magic numbers
 geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
 domain = geom.add_rectangle([0, 0, 0], 1, 1.1)
 lower_c = geom.add_rectangle([0, 0, 0], 0.5, 0.2)
@@ -21,11 +22,16 @@ upper_c = geom.add_rectangle([0, 0.8, 0], 0.5, 0.2)
 mid_c = geom.add_rectangle([0, 0.1, 0], 0.2, 0.8)
 c = geom.boolean_union([lower_c, upper_c, mid_c])
 coil = geom.add_rectangle([0.2, 0.2, 0], 0.2, 0.6)
-airgap = geom.boolean_difference([domain], [c, coil], delete_other=False)
-frags = geom.boolean_fragments([airgap], [c, coil])
+lower_c2 = geom.add_rectangle([0.55, 0, 0], 0.35, 0.2)
+upper_c2 = geom.add_rectangle([0.55, 0.8, 0], 0.35, 0.2)
+mid_c2 = geom.add_rectangle([0.7, 0, 0], 0.2, 1.0)
+c2 = geom.boolean_union([lower_c2, upper_c2, mid_c2])
+airgap = geom.boolean_difference([domain], [c, c2, coil], delete_other=False)
+frags = geom.boolean_fragments([airgap], [c, c2, coil])
 geom.add_physical(airgap, 1)
 geom.add_physical(c, 2)
 geom.add_physical(coil, 3)
+geom.add_physical(c2, 4)
 # print(geom.get_code())
 pygmsh_mesh = pygmsh.generate_mesh(geom)
 
@@ -77,9 +83,11 @@ v = TestFunction(V)
 
 dx = Measure("dx", subdomain_data=mat_mt)
 
+# TODO ADD conduction term.
 a = (1 / mu_0) * inner(grad(A_z), grad(v)) * dx(1) \
     + (1 / mu_0) * inner(grad(A_z), grad(v)) * dx(3) \
-    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(2)
+    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(2) \
+    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(4)
 L = inner(J, v) * dx(3)
 
 A_z = Function(V)
