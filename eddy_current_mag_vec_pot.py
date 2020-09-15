@@ -172,8 +172,8 @@ class Prob2(Problem):
         geom.boolean_fragments([left_coil], [stator])
         left_coil = geom.boolean_difference([left_coil], [air_gap_circ])
 
-        outer_rotor = geom.add_disk([0.0, 0.0, 0.0], r2)
-        rotor_steel = geom.add_disk([0.0, 0.0, 0.0], r1)
+        outer_rotor = geom.add_disk([0.0, 0.0, 0.0], r2, char_length=h/2)
+        rotor_steel = geom.add_disk([0.0, 0.0, 0.0], r1, char_length=h/2)
         rotor_al = geom.boolean_difference([outer_rotor], [rotor_steel],
                                            delete_other=False)
         air = geom.boolean_difference(
@@ -424,8 +424,9 @@ def compute_ave_power_loss(A, problem):
 
 
 if __name__ == "__main__":
-    h = 0.001
-    freq = 1
+    h = 0.00075
+    # Increase to 500 Hz to see skin effect
+    freq = 50
     k = 2
 
     print("A")
