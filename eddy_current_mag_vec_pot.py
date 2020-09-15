@@ -14,8 +14,10 @@ from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
 from dolfinx.fem.assemble import assemble_scalar
 
 
-# TODO Add references/page numbers for equations
-
+# TODO Add page numbers for equations
+# References:
+# [1] "Electromagnetic Modeling by Finite Element Methods"
+#     by Bastos and Sadowski
 
 class Problem:
     def __init__(self, h, freq, J_s, k):
@@ -162,10 +164,29 @@ def compute_B_from_A(A, problem):
                                         "pc_type": "lu"})
     return B
 
-    # with XDMFFile(MPI.COMM_WORLD, "B.xdmf", "w") as file:
-    #     file.write_mesh(mesh)
-    #     file.write_function(B)
 
+# The eddy current "phasor" J_e = - \sigma * i * \omega A^~ (see [1] pgs 235
+# and 242). In the code, I use A to represent A^~
+def compute_J_e_from_A(A, problem):
+    V = FunctionSpace(problem.mesh,
+                      ("Lagrange", problem.k))
+    J_e = TrialFunction(V)
+    v = TestFunction(V)
+    # FIXME ADD Mat dict to problem
+    sigma_iron = 1e7
+    omega = 2 * np.pi * problem.freq
+    f = - sigma_iron * 1j * omega * A
+
+    dx = Measure("dx", subdomain_data=problem.mat_mt)
+
+    a = inner(J_e, v) * ufl.dx
+    # FIXME  Integrate over correct region!
+    L = inner(f, v) * dx(4)
+
+    J_e = Function(V)
+    solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly",
+                                          "pc_type": "lu"})
+    return J_e
 
     # # Output file
     # file = XDMFFile(MPI.COMM_WORLD, "J.xdmf", "w")
@@ -208,3 +229,6 @@ if __name__ == "__main__":
 
     B = compute_B_from_A(A, problem)
     save(problem.mesh, B, "B.xdmf")
+
+    J_e = compute_J_e_from_A(A, problem)
+    save(problem.mesh, J_e, "J_e.xdmf")
