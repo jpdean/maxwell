@@ -214,8 +214,6 @@ def compute_B_from_A(A, problem):
     return B
 
 
-# The eddy current "phasor" J_e = - \sigma * i * \omega A^~ (see [1] pgs 235
-# and 242). In the code, I use A to represent A^~
 def compute_J_e_from_A(A, problem):
     # FIXME Make this use project functoin once material properties have
     # been added
@@ -223,16 +221,21 @@ def compute_J_e_from_A(A, problem):
                       ("Lagrange", problem.k))
     J_e = TrialFunction(V)
     v = TestFunction(V)
-    # FIXME ADD Mat dict to problem
-    sigma_iron = 1e7
-    omega = problem.calc_omega()
-    f = - sigma_iron * 1j * omega * A
 
+    omega = problem.calc_omega()
+    mat_dict = problem.get_mat_dict()
     dx = Measure("dx", subdomain_data=problem.mat_mt)
 
+    # The eddy current "phasor" J_e = - \sigma * i * \omega A^~
+    # (see [1] pgs 235 and 242). In the code, I use A to represent A^~
+    L_integral_list = []
+    for index, mat_prop in mat_dict.items():
+        if mat_prop.sigma is not None:
+            f = - mat_prop.sigma * 1j * omega * A
+            L_integral_list.append(inner(f, v) * dx(index))
+
     a = inner(J_e, v) * ufl.dx
-    # FIXME  Integrate over correct region!
-    L = inner(f, v) * dx(4)
+    L = sum(L_integral_list)
 
     J_e = Function(V)
     solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly",
