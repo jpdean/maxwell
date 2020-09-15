@@ -141,14 +141,6 @@ def solver(problem):
     return A
 
 
-# TODO Make a time dependent save option (i.e. to save field with
-# e^{i omega t})
-def save(mesh, v, file_name):
-    with XDMFFile(MPI.COMM_WORLD, file_name, "w") as file:
-        file.write_mesh(mesh)
-        file.write_function(v)
-
-
 def project(f, V):
     u = TrialFunction(V)
     v = TestFunction(V)
@@ -201,57 +193,38 @@ def compute_J_e_from_A(A, problem):
 # 242). Other quantities can be obtaineed from A, B, J_e etc. in the same
 # manner. Note that the phase angle of J_s it taken to be zero (i.e. the
 # reference).
-def save_time_dependent_solution(v, problem, file_name, n=100):
-    out_file = XDMFFile(MPI.COMM_WORLD, file_name, "w")
-    out_file.write_mesh(problem.mesh)
+def save(v, problem, file_name, n=100, time_series=False):
+    if not time_series:
+        with XDMFFile(MPI.COMM_WORLD, file_name, "w") as file:
+            file.write_mesh(problem.mesh)
+            file.write_function(v)
+    else:
+        out_file = XDMFFile(MPI.COMM_WORLD, file_name, "w")
+        out_file.write_mesh(problem.mesh)
 
-    t = 0
-    T = 1 / problem.freq
-    omega = 2 * np.pi * freq
-    delta_t = T / n
+        t = 0
+        T = 1 / problem.freq
+        omega = 2 * np.pi * freq
+        delta_t = T / n
 
-    V = v.function_space
-    # Need to always write out the same vector, otherwise when opened in
-    # Paraview there are lots of different fields which is annoying for
-    # playback
-    v_out = Function(V)
+        V = v.function_space
+        # Need to always write out the same vector, otherwise when opened in
+        # Paraview there are lots of different fields which is annoying for
+        # playback
+        v_out = Function(V)
 
-    while t < T:
-        f = real(v * ufl.exp(1j * omega * t))
-        v_eval_at_t = project(f, V)
-        v_eval_at_t.vector.copy(result=v_out.vector)
-        out_file.write_function(v_out, t)
-        t += delta_t
-
-
-    # # Output file
-    # file = XDMFFile(MPI.COMM_WORLD, "J.xdmf", "w")
-    # file.write_mesh(mesh)
-
-    # X = FunctionSpace(mesh, ("CG", 1))
-    # t = 0
-    # T = 1 / freq
-    # # NOTE J_e_sol needed so that it all outputs to the same name in paraview
-    # J_e_sol = Function(X)
-    # while t < T:
-    #     t += T / 100
-    #     # TODO This should be the real part. Find out how to get this
-    #     f = - sigma_iron * 1j * omega * A_z * ufl.exp(1j * omega * t)
-    #     J_e = TrialFunction(X)
-    #     v = TestFunction(X)
-
-    #     a = inner(J_e, v) * ufl.dx
-    #     L = inner(f, v) * dx(4)
-
-    #     J_e = Function(X)
-    #     solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
-    #     J_e.vector.copy(result=J_e_sol.vector)
-    #     file.write_function(J_e_sol, t)
+        while t < T:
+            f = real(v * ufl.exp(1j * omega * t))
+            v_eval_at_t = project(f, V)
+            v_eval_at_t.vector.copy(result=v_out.vector)
+            out_file.write_function(v_out, t)
+            t += delta_t
 
     # # NOTE Inner takes complex conjugate of secon argument, so no need to e.g. get magnitude
     # # pg 244 of Bastos and Sadowski
     # ave_power = omega**2 / 2 * mesh.mpi_comm().allreduce(assemble_scalar(sigma_iron * inner(A_z, A_z) * dx(4)), op=MPI.SUM)
     # print(f"Average power loss = {ave_power} W")
+
 
 if __name__ == "__main__":
     h = 0.01
@@ -259,13 +232,15 @@ if __name__ == "__main__":
     J_s = 100
     k = 2
 
+    print("A")
     problem = Prob1(h, freq, J_s, k)
     A = solver(problem)
-    save(problem.mesh, A, "A.xdmf")
-    save_time_dependent_solution(A, problem, "A(t).xdmf")
+    save(A, problem, "A.xdmf", time_series=False)
 
+    print("B")
     B = compute_B_from_A(A, problem)
-    save(problem.mesh, B, "B.xdmf")
+    save(B, problem, "B.xdmf", time_series=True)
 
+    print("J_e")
     J_e = compute_J_e_from_A(A, problem)
-    save(problem.mesh, J_e, "J_e.xdmf")
+    save(J_e, problem, "J_e.xdmf", time_series=False)
