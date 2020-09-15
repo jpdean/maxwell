@@ -10,7 +10,8 @@ from dolfinx.fem import DirichletBC, locate_dofs_topological
 from dolfinx import (FunctionSpace, Function, Constant, solve,
                      VectorFunctionSpace)
 import ufl
-from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
+from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
+                 as_vector, real)
 from dolfinx.fem.assemble import assemble_scalar
 
 
@@ -148,26 +149,33 @@ def save(mesh, v, file_name):
         file.write_function(v)
 
 
+def project(f, V):
+    u = TrialFunction(V)
+    v = TestFunction(V)
+
+    a = inner(u, v) * ufl.dx
+    L = inner(f, v) * ufl.dx
+
+    u = Function(V)
+    solve(a == L, u, [], petsc_options={"ksp_type": "preonly",
+                                        "pc_type": "lu"})
+    return u
+
+
 def compute_B_from_A(A, problem):
     # TODO Is there a better way?
     V = VectorFunctionSpace(problem.mesh,
                             ("Discontinuous Lagrange", problem.k - 1))
-    B = TrialFunction(V)
-    v = TestFunction(V)
     f = as_vector((A.dx(1), - A.dx(0)))
-
-    a = inner(B, v) * ufl.dx
-    L = inner(f, v) * ufl.dx
-
-    B = Function(V)
-    solve(a == L, B, [], petsc_options={"ksp_type": "preonly",
-                                        "pc_type": "lu"})
+    B = project(f, V)
     return B
 
 
 # The eddy current "phasor" J_e = - \sigma * i * \omega A^~ (see [1] pgs 235
 # and 242). In the code, I use A to represent A^~
 def compute_J_e_from_A(A, problem):
+    # FIXME Make this use project functoin once material properties have
+    # been added
     V = FunctionSpace(problem.mesh,
                       ("Lagrange", problem.k))
     J_e = TrialFunction(V)
@@ -187,6 +195,34 @@ def compute_J_e_from_A(A, problem):
     solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly",
                                           "pc_type": "lu"})
     return J_e
+
+
+# The actual source current is given by Re(J_s e^{i \omega t}) (see [1] pg
+# 242). Other quantities can be obtaineed from A, B, J_e etc. in the same
+# manner. Note that the phase angle of J_s it taken to be zero (i.e. the
+# reference).
+def save_time_dependent_solution(v, problem, file_name, n=100):
+    out_file = XDMFFile(MPI.COMM_WORLD, file_name, "w")
+    out_file.write_mesh(problem.mesh)
+
+    t = 0
+    T = 1 / problem.freq
+    omega = 2 * np.pi * freq
+    delta_t = T / n
+
+    V = v.function_space
+    # Need to always write out the same vector, otherwise when opened in
+    # Paraview there are lots of different fields which is annoying for
+    # playback
+    v_out = Function(V)
+
+    while t < T:
+        f = real(v * ufl.exp(1j * omega * t))
+        v_eval_at_t = project(f, V)
+        v_eval_at_t.vector.copy(result=v_out.vector)
+        out_file.write_function(v_out, t)
+        t += delta_t
+
 
     # # Output file
     # file = XDMFFile(MPI.COMM_WORLD, "J.xdmf", "w")
@@ -226,6 +262,7 @@ if __name__ == "__main__":
     problem = Prob1(h, freq, J_s, k)
     A = solver(problem)
     save(problem.mesh, A, "A.xdmf")
+    save_time_dependent_solution(A, problem, "A(t).xdmf")
 
     B = compute_B_from_A(A, problem)
     save(problem.mesh, B, "B.xdmf")
