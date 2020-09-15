@@ -14,6 +14,9 @@ from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
 from dolfinx.fem.assemble import assemble_scalar
 
 
+# TODO Add references/page numbers for equations
+
+
 class Problem:
     def __init__(self, h, freq, J_s, k):
         self.h = h
@@ -135,22 +138,29 @@ def solver(problem):
     return A
 
 
+# TODO Make a time dependent save option (i.e. to save field with
+# e^{i omega t})
 def save(mesh, v, file_name):
     with XDMFFile(MPI.COMM_WORLD, file_name, "w") as file:
         file.write_mesh(mesh)
         file.write_function(v)
 
-    # # TODO Is there a better way? Is the project needed? What space?
-    # W = VectorFunctionSpace(mesh, ("DG", 1))
-    # B = TrialFunction(W)
-    # v = TestFunction(W)
-    # f = as_vector((A_z.dx(1), -A_z.dx(0)))
 
-    # a = inner(B, v) * ufl.dx
-    # L = inner(f, v) * ufl.dx
+def compute_B_from_A(A, problem):
+    # TODO Is there a better way?
+    V = VectorFunctionSpace(problem.mesh,
+                            ("Discontinuous Lagrange", problem.k - 1))
+    B = TrialFunction(V)
+    v = TestFunction(V)
+    f = as_vector((A.dx(1), - A.dx(0)))
 
-    # B = Function(W)
-    # solve(a == L, B, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    a = inner(B, v) * ufl.dx
+    L = inner(f, v) * ufl.dx
+
+    B = Function(V)
+    solve(a == L, B, [], petsc_options={"ksp_type": "preonly",
+                                        "pc_type": "lu"})
+    return B
 
     # with XDMFFile(MPI.COMM_WORLD, "B.xdmf", "w") as file:
     #     file.write_mesh(mesh)
@@ -195,3 +205,6 @@ if __name__ == "__main__":
     problem = Prob1(h, freq, J_s, k)
     A = solver(problem)
     save(problem.mesh, A, "A.xdmf")
+
+    B = compute_B_from_A(A, problem)
+    save(problem.mesh, B, "B.xdmf")
