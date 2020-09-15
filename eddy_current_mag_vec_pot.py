@@ -12,7 +12,13 @@ from dolfinx import (FunctionSpace, Function, Constant, solve,
 import ufl
 from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
 
-h = 0.025
+h = 0.01
+freq = 0.01
+omega = 2 * np.pi * freq
+mu_0 = 4 * np.pi * 1e-7
+mu_r_iron = 5000
+J_s = 1
+sigma_iron = 1e7
 
 # TODO Remove magic numbers
 geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
@@ -75,9 +81,8 @@ facets = locate_entities_boundary(mesh, 1, bound_marker)
 bdofs = locate_dofs_topological(V, 1, facets)
 bc = DirichletBC(u_bc, bdofs)
 
-mu_0 = 4 * np.pi * 1e-7
-mu_r_iron = 5000
-J = Constant(mesh, 1.0)
+J = Constant(mesh, J_s)
+
 A_z = TrialFunction(V)
 v = TestFunction(V)
 
@@ -87,7 +92,8 @@ dx = Measure("dx", subdomain_data=mat_mt)
 a = (1 / mu_0) * inner(grad(A_z), grad(v)) * dx(1) \
     + (1 / mu_0) * inner(grad(A_z), grad(v)) * dx(3) \
     + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(2) \
-    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(4)
+    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(4) \
+    - sigma_iron * 1j * omega * inner(A_z, v) * dx(4)
 L = inner(J, v) * dx(3)
 
 A_z = Function(V)
@@ -113,3 +119,28 @@ solve(a == L, B, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
 with XDMFFile(MPI.COMM_WORLD, "B.xdmf", "w") as file:
     file.write_mesh(mesh)
     file.write_function(B)
+
+
+# Output file
+file = XDMFFile(MPI.COMM_WORLD, "J.xdmf", "w")
+file.write_mesh(mesh)
+
+X = FunctionSpace(mesh, ("CG", 1))
+t = 0
+T = 1 / freq
+# NOTE J_e_sol needed so that it all outputs to the same name in paraview
+J_e_sol = Function(X)
+while t < T:
+    t += T / 100
+    # TODO This should be the real part. Find out how to get this
+    f = - sigma_iron * 1j * omega * A_z * ufl.exp(1j * omega * t)
+    J_e = TrialFunction(X)
+    v = TestFunction(X)
+
+    a = inner(J_e, v) * ufl.dx
+    L = inner(f, v) * dx(4)
+
+    J_e = Function(X)
+    solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+    J_e.vector.copy(result=J_e_sol.vector)
+    file.write_function(J_e_sol, t)
