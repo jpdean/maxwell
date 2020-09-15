@@ -271,8 +271,9 @@ def save(v, problem, file_name, n=100, time_series=False):
         v_out = Function(V)
 
         while t < T:
-            # NOTE Originally I used ufl.real to get the real part only, but for
-            # some reason this breaks project for vector fields. Not sure why.
+            # NOTE Originally I used ufl.real to get the real part only, but
+            # for some reason this breaks project for vector fields. Not
+            # sure why.
             # NOTE See [1] pg 242
             f = v * ufl.exp(1j * omega * t)
             v_eval_at_t = project(f, V)
