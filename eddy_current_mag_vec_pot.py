@@ -1,6 +1,12 @@
+# 2D solver for the magnetic vector potential. See [1] and [2] for
+# more information
 # NOTE 2D solver therefore magnetic vector potential only has a single
 # component in the z direction, called A in the code. The B field lies
 # in the 2D plane. The current density has only a z component.
+# References:
+# [1] "Electromagnetic Modeling by Finite Element Methods"
+#     by Bastos and Sadowski
+# [2] https://fenicsproject.org/pub/tutorial/html/._ftut1015.html#___sec104
 
 import pygmsh
 import numpy as np
@@ -20,9 +26,6 @@ from dolfinx.fem.assemble import assemble_scalar
 
 
 # TODO Add page numbers for equations
-# References:
-# [1] "Electromagnetic Modeling by Finite Element Methods"
-#     by Bastos and Sadowski
 
 class Problem:
     def __init__(self, h, freq, k):
@@ -43,6 +46,9 @@ class Problem:
 
     def get_mat_dict(self):
         return None
+
+    def calc_omega(self):
+        return 2 * np.pi * self.freq
 
 
 class Prob1(Problem):
@@ -146,7 +152,7 @@ def solver(problem):
     mat_mt = problem.mat_mt
     k = problem.k
     # TODO Make the problem compute this
-    omega = 2 * np.pi * problem.freq
+    omega = problem.calc_omega()
     mat_dict = problem.get_mat_dict()
 
     V = FunctionSpace(mesh, ("Lagrange", k))
@@ -202,6 +208,8 @@ def compute_B_from_A(A, problem):
     # TODO Is there a better way?
     V = VectorFunctionSpace(problem.mesh,
                             ("Discontinuous Lagrange", problem.k - 1))
+    A_vec = as_vector((0, 0, A))
+    # See [2]
     f = as_vector((A.dx(1), - A.dx(0)))
     B = project(f, V)
     return B
@@ -218,7 +226,7 @@ def compute_J_e_from_A(A, problem):
     v = TestFunction(V)
     # FIXME ADD Mat dict to problem
     sigma_iron = 1e7
-    omega = 2 * np.pi * problem.freq
+    omega = problem.calc_omega()
     f = - sigma_iron * 1j * omega * A
 
     dx = Measure("dx", subdomain_data=problem.mat_mt)
@@ -255,7 +263,7 @@ def save(v, problem, file_name, n=100, time_series=False):
 
         t = 0
         T = 1 / problem.freq
-        omega = 2 * np.pi * freq
+        omega = problem.calc_omega()
         delta_t = T / n
 
         V = v.function_space
@@ -276,7 +284,7 @@ def save(v, problem, file_name, n=100, time_series=False):
 
 # From pg 244 of [1]
 def compute_ave_power_loss(A, problem):
-    omega = 2 * np.pi * problem.freq
+    omega = problem.calc_omega()
     # FIXME Pass region to integrate and material properties
     sigma_iron = 1e7
     # NOTE Inner takes complex conjugate of secon argument, so no need
