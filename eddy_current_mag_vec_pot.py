@@ -284,16 +284,22 @@ def save(v, problem, file_name, n=100, time_series=False):
             t += delta_t
 
 
-# From pg 244 of [1]
 def compute_ave_power_loss(A, problem):
     omega = problem.calc_omega()
-    # FIXME Pass region to integrate and material properties
-    sigma_iron = 1e7
-    # NOTE Inner takes complex conjugate of secon argument, so no need
-    # to e.g. get magnitude
     dx = Measure("dx", subdomain_data=problem.mat_mt)
+    mat_dict = problem.get_mat_dict()
+
+    L_integral_list = []
+    for index, mat_prop in mat_dict.items():
+        if mat_prop.sigma is not None:
+            # From pg 244 of [1]
+            # NOTE Inner takes complex conjugate of secon argument, so no need
+            # to e.g. get magnitude
+            L_integral_list.append(mat_prop.sigma * inner(A, A) * dx(index))
+
+    L = sum(L_integral_list)
     ave_power_loss = omega**2 / 2 * problem.mesh.mpi_comm().allreduce(
-        assemble_scalar(sigma_iron * inner(A, A) * dx(4)), op=MPI.SUM)
+        assemble_scalar(L), op=MPI.SUM)
     # This will only have a real component so take that
     return real(ave_power_loss)
 
