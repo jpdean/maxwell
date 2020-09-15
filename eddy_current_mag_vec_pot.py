@@ -7,13 +7,15 @@ from dolfinx.cpp.graph import AdjacencyList_int32
 from mpi4py import MPI
 from dolfinx.io import XDMFFile, ufl_mesh_from_gmsh
 from dolfinx.fem import DirichletBC, locate_dofs_topological
-from dolfinx import FunctionSpace, Function, Constant, solve
-from ufl import grad, TrialFunction, TestFunction, inner, Measure
+from dolfinx import (FunctionSpace, Function, Constant, solve,
+                     VectorFunctionSpace)
+import ufl
+from ufl import grad, TrialFunction, TestFunction, inner, Measure, as_vector
 
-h = 0.1
+h = 0.05
 
-geom = pygmsh.opencascade.Geometry()
-domain = geom.add_rectangle([0, 0, 0], 1, 1.1, char_length=h)
+geom = pygmsh.opencascade.Geometry(characteristic_length_max=h)
+domain = geom.add_rectangle([0, 0, 0], 1, 1.1)
 lower_c = geom.add_rectangle([0, 0, 0], 0.5, 0.2)
 upper_c = geom.add_rectangle([0, 0.8, 0], 0.5, 0.2)
 mid_c = geom.add_rectangle([0, 0.1, 0], 0.2, 0.8)
@@ -25,7 +27,7 @@ geom.add_physical(c, 2)
 # print(geom.get_code())
 pygmsh_mesh = pygmsh.generate_mesh(geom)
 
-# Prune z, probably a better way to do this...
+# Prune z, probably a better way to do this (see generate mesh options)
 x = np.array([pt[0:2] for pt in pygmsh_mesh.points])
 
 cells = np.vstack([cells.data for cells in pygmsh_mesh.cells])
@@ -42,7 +44,7 @@ mat_mt = create_meshtags(mesh, 2,
                          AdjacencyList_int32(local_entities),
                          np.int32(local_values))
 
-V = FunctionSpace(mesh, ("Lagrange", 1))
+V = FunctionSpace(mesh, ("Lagrange", 2))
 
 
 # TODO Replace with meshtag
@@ -65,16 +67,16 @@ facets = locate_entities_boundary(mesh, 1, bound_marker)
 bdofs = locate_dofs_topological(V, 1, facets)
 bc = DirichletBC(u_bc, bdofs)
 
-mu_vacuum = 4 * np.pi * 1e-7
-mu_iron = 1e-5 # use relative
+mu_0 = 4 * np.pi * 1e-7
+mu_r_iron = 1
 J = Constant(mesh, 1.0)
 A_z = TrialFunction(V)
 v = TestFunction(V)
 
 dx = Measure("dx", subdomain_data=mat_mt)
 
-a = (1 / mu_vacuum) * inner(grad(A_z), grad(v)) * dx(1) \
-    + (1 / mu_iron) * inner(grad(A_z), grad(v)) * dx(2)
+a = (1 / mu_0) * inner(grad(A_z), grad(v)) * dx(1) \
+    + (1 / (mu_r_iron * mu_0)) * inner(grad(A_z), grad(v)) * dx(2)
 L = inner(J, v) * dx(2)
 
 A_z = Function(V)
@@ -84,3 +86,19 @@ solve(a == L, A_z, bc, petsc_options={"ksp_type": "preonly",
 with XDMFFile(MPI.COMM_WORLD, "A_z.xdmf", "w") as file:
     file.write_mesh(mesh)
     file.write_function(A_z)
+
+# TODO Is there a better way? Is the project needed? What space?
+W = VectorFunctionSpace(mesh, ("DG", 1))
+B = TrialFunction(W)
+v = TestFunction(W)
+f = as_vector((A_z.dx(1), -A_z.dx(0)))
+
+a = inner(B, v) * ufl.dx
+L = inner(f, v) * ufl.dx
+
+B = Function(W)
+solve(a == L, B, [], petsc_options={"ksp_type": "preonly", "pc_type": "lu"})
+
+with XDMFFile(MPI.COMM_WORLD, "B.xdmf", "w") as file:
+    file.write_mesh(mesh)
+    file.write_function(B)
