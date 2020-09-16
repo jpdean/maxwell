@@ -34,6 +34,7 @@ class Problem:
         self.k = k
         self.mesh, self.mat_mt = self.create_mesh()
         self.mu = self.create_mu()
+        self.sigma = self.create_sigma()
 
     def create_mesh(self):
         return None
@@ -51,6 +52,9 @@ class Problem:
         return 2 * np.pi * self.freq
 
     def create_mu(self):
+        return None
+
+    def create_sigma(self):
         return None
 
 
@@ -283,6 +287,30 @@ class Prob2(Problem):
                 mu.vector.setValueLocal(i, props.permiability_copper)
         return mu
 
+    def create_sigma(self):
+        V = FunctionSpace(self.mesh, ("Discontinuous Lagrange", 0))
+        sigma = Function(V)
+        mat_mt = self.mat_mt
+
+        for i in range(V.dim):
+            if mat_mt.values[i] == 1:
+                sigma.vector.setValueLocal(i, props.conductivity_air)
+            elif mat_mt.values[i] == 2:
+                # Iron in this region is laminated so assume zero
+                # conductivity
+                sigma.vector.setValueLocal(i, 0)
+            elif mat_mt.values[i] == 3:
+                sigma.vector.setValueLocal(i, props.conductivity_aluminium)
+            elif mat_mt.values[i] == 4:
+                sigma.vector.setValueLocal(i, props.conductivity_iron)
+            elif mat_mt.values[i] == 5:
+                # J_s prescribed in coil, so set sigma to 0
+                sigma.vector.setValueLocal(i, 0)
+            elif mat_mt.values[i] == 6:
+                # J_s prescribed in coil, so set sigma to 0
+                sigma.vector.setValueLocal(i, 0)
+        return sigma
+
 
 class MatProp:
     def __init__(self, name, mu, sigma, J_s):
@@ -312,19 +340,15 @@ def solver(problem):
 
     dx_mt = Measure("dx", subdomain_data=mat_mt)
 
-    a_integral_list = []
     L_integral_list = []
     for index, mat_prop in mat_dict.items():
-        if mat_prop.sigma is not None:
-            a_integral_list.append(
-                - mat_prop.sigma * 1j * omega * inner(A, v) * dx_mt(index))
         if mat_prop.J_s is not None:
             # TODO Could easily remove assumption of J being constant.
             J_s = Constant(mesh, mat_prop.J_s)
             L_integral_list.append(inner(J_s, v) * dx_mt(index))
 
-    a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx
-    a += sum(a_integral_list)
+    a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx \
+        - problem.sigma * 1j * omega * inner(A, v) * ufl.dx
     L = sum(L_integral_list)
 
     A = Function(V)
