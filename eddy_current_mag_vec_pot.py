@@ -45,9 +45,6 @@ class Problem:
     def bound_cond(self, x):
         return None
 
-    def get_mat_dict(self):
-        return None
-
     def calc_omega(self):
         return 2 * np.pi * self.freq
 
@@ -55,6 +52,9 @@ class Problem:
         return None
 
     def create_sigma(self):
+        return None
+
+    def get_J_s_dict(self):
         return None
 
 
@@ -228,32 +228,6 @@ class Prob2(Problem):
         values = np.zeros((1, x.shape[1]))
         return values
 
-    def get_mat_dict(self):
-        air_mat_prop = MatProp(name="Air",
-                               J_s=None)
-        # Laminated -> low conductance -> set sigma to None to not
-        # include integral
-        laminated_iron_mat_prop = MatProp(name="Laminated iron",
-                                          J_s=None)
-        # We prescrive the total current in the coil (with J_s), so sigma set
-        # to None
-        right_coil_mat_prop = MatProp(name="Right Coil",
-                                      J_s=3.1e6)
-        left_coil_mat_prop = MatProp(name="Left Coil",
-                                     J_s=-3.1e6)
-        alu_mat_prop = MatProp(name="Aluminium",
-                               J_s=None)
-        iron_mat_prop = MatProp(name="Iron",
-                                J_s=None)
-
-        mat_dict = {1: air_mat_prop,
-                    2: laminated_iron_mat_prop,
-                    3: alu_mat_prop,
-                    4: iron_mat_prop,
-                    5: left_coil_mat_prop,
-                    6: right_coil_mat_prop}
-        return mat_dict
-
     def create_mu(self):
         # Based on https://fenicsproject.discourse.group/t/dolfinx-discontinous-expression/2582/3
         V = FunctionSpace(self.mesh, ("Discontinuous Lagrange", 0))
@@ -299,11 +273,10 @@ class Prob2(Problem):
                 sigma.vector.setValueLocal(i, 0)
         return sigma
 
-
-class MatProp:
-    def __init__(self, name, J_s):
-        self.name = name
-        self.J_s = J_s
+    def get_J_s_dict(self):
+        # Prescribe J_s in left and right coils (numbered 5 and 6
+        # respectively)
+        return {5: -3.1e6, 6: 3.1e6}
 
 
 def solver(problem):
@@ -311,7 +284,6 @@ def solver(problem):
     mat_mt = problem.mat_mt
     k = problem.k
     omega = problem.calc_omega()
-    mat_dict = problem.get_mat_dict()
 
     V = FunctionSpace(mesh, ("Lagrange", k))
 
@@ -324,17 +296,18 @@ def solver(problem):
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    dx_mt = Measure("dx", subdomain_data=mat_mt)
-
-    L_integral_list = []
-    for index, mat_prop in mat_dict.items():
-        if mat_prop.J_s is not None:
-            # TODO Could easily remove assumption of J being constant.
-            J_s = Constant(mesh, mat_prop.J_s)
-            L_integral_list.append(inner(J_s, v) * dx_mt(index))
-
     a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx \
         - problem.sigma * 1j * omega * inner(A, v) * ufl.dx
+
+    # NOTE Could handle J_s in a similar way as mu and sigma (i.e. DG0
+    # functions defined on whole domain), but I think this way makes
+    # it easier to cope with non-constant current densities
+    dx_mt = Measure("dx", subdomain_data=mat_mt)
+    L_integral_list = []
+    for index, J_s in problem.get_J_s_dict().items():
+        # TODO Could easily remove assumption of J being constant.
+        J_s = Constant(mesh, J_s)
+        L_integral_list.append(inner(J_s, v) * dx_mt(index))
     L = sum(L_integral_list)
 
     A = Function(V)
