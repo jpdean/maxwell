@@ -230,32 +230,20 @@ class Prob2(Problem):
 
     def get_mat_dict(self):
         air_mat_prop = MatProp(name="Air",
-                               mu=4 * np.pi * 1e-7,
-                               sigma=None,
                                J_s=None)
         # Laminated -> low conductance -> set sigma to None to not
         # include integral
         laminated_iron_mat_prop = MatProp(name="Laminated iron",
-                                          mu=6.3e-3,
-                                          sigma=None,
                                           J_s=None)
         # We prescrive the total current in the coil (with J_s), so sigma set
         # to None
         right_coil_mat_prop = MatProp(name="Right Coil",
-                                      mu=1.3e-6,
-                                      sigma=None,
                                       J_s=3.1e6)
         left_coil_mat_prop = MatProp(name="Left Coil",
-                                     mu=1.3e-6,
-                                     sigma=None,
                                      J_s=-3.1e6)
         alu_mat_prop = MatProp(name="Aluminium",
-                               mu=1.23e-6,
-                               sigma=3.77e7,
                                J_s=None)
         iron_mat_prop = MatProp(name="Iron",
-                                mu=6.3e-3,
-                                sigma=1e7,
                                 J_s=None)
 
         mat_dict = {1: air_mat_prop,
@@ -313,10 +301,8 @@ class Prob2(Problem):
 
 
 class MatProp:
-    def __init__(self, name, mu, sigma, J_s):
+    def __init__(self, name, J_s):
         self.name = name
-        self.mu = mu
-        self.sigma = sigma
         self.J_s = J_s
 
 
@@ -381,31 +367,14 @@ def compute_B_from_A(A, problem):
 
 
 def compute_J_e_from_A(A, problem):
-    # TODO Would be nice if this could use the project function.
-    # The RHS integral makes it slightly more clumsy
     V = FunctionSpace(problem.mesh,
                       ("Lagrange", problem.k))
-    J_e = TrialFunction(V)
-    v = TestFunction(V)
-
     omega = problem.calc_omega()
-    mat_dict = problem.get_mat_dict()
-    dx_mt = Measure("dx", subdomain_data=problem.mat_mt)
-
     # The eddy current "phasor" J_e = - \sigma * i * \omega A^~
     # (see [1] pgs 235 and 242). In the code, I use A to represent A^~
-    L_integral_list = []
-    for index, mat_prop in mat_dict.items():
-        if mat_prop.sigma is not None:
-            f = - mat_prop.sigma * 1j * omega * A
-            L_integral_list.append(inner(f, v) * dx_mt(index))
+    f = - problem.sigma * 1j * omega * A
 
-    a = inner(J_e, v) * ufl.dx
-    L = sum(L_integral_list)
-
-    J_e = Function(V)
-    solve(a == L, J_e, [], petsc_options={"ksp_type": "preonly",
-                                          "pc_type": "lu"})
+    J_e = project(f, V)
     return J_e
 
 
@@ -453,18 +422,11 @@ def save(v, problem, file_name, n=100, time_series=False):
 
 def compute_ave_power_loss(A, problem):
     omega = problem.calc_omega()
-    dx_mt = Measure("dx", subdomain_data=problem.mat_mt)
-    mat_dict = problem.get_mat_dict()
 
-    L_integral_list = []
-    for index, mat_prop in mat_dict.items():
-        if mat_prop.sigma is not None:
-            # From pg 244 of [1]
-            # NOTE Inner takes complex conjugate of secon argument, so no need
-            # to e.g. get magnitude
-            L_integral_list.append(mat_prop.sigma * inner(A, A) * dx_mt(index))
-
-    L = sum(L_integral_list)
+    # From pg 244 of [1]
+    # NOTE Inner takes complex conjugate of secon argument, so no need
+    # to e.g. get magnitude
+    L = problem.sigma * inner(A, A) * ufl.dx
     ave_power_loss = omega**2 / 2 * problem.mesh.mpi_comm().allreduce(
         assemble_scalar(L), op=MPI.SUM)
     # This will only have a real component so take that
