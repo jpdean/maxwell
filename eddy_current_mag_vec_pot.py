@@ -21,7 +21,7 @@ from dolfinx import (FunctionSpace, Function, Constant, solve,
                      VectorFunctionSpace)
 import ufl
 from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
-                 as_vector, real)
+                 as_vector, real, SpatialCoordinate, sqrt)
 from dolfinx.fem.assemble import assemble_scalar
 import physical_properties as props
 
@@ -322,13 +322,20 @@ def solver(problem):
     A = TrialFunction(V)
     v = TestFunction(V)
 
+    dx_mt = Measure("dx", subdomain_data=mat_mt)
+
+    # See [1] pg 246
+    x = SpatialCoordinate(mesh)
+    omega_rotor = 2 * np.pi * 60
+    vel = omega_rotor * as_vector((- x[1], x[0]))
     a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx \
-        - problem.sigma * 1j * omega * inner(A, v) * ufl.dx
+        - problem.sigma * 1j * omega * inner(A, v) * ufl.dx \
+        + problem.sigma * inner(A.dx(0) * vel[0] + A.dx(1) * vel[1], v) \
+            * (dx_mt(3) + dx_mt(4))  # TODO CHECK SIGN
 
     # NOTE Could handle J_s in a similar way as mu and sigma (i.e. DG0
     # functions defined on whole domain), but I think this way makes
     # it easier to cope with non-constant current densities
-    dx_mt = Measure("dx", subdomain_data=mat_mt)
     L_integral_list = []
     for index, J_s in problem.get_J_s_dict().items():
         # TODO Could easily remove assumption of J being constant.
@@ -434,7 +441,7 @@ def compute_ave_power_loss(A, problem):
 
 if __name__ == "__main__":
     print("A")
-    problem = Prob1()
+    problem = Prob2()
     A = solver(problem)
     save(A, problem, "A.xdmf", time_series=False)
 
