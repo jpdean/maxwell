@@ -23,6 +23,7 @@ import ufl
 from ufl import (grad, TrialFunction, TestFunction, inner, Measure,
                  as_vector, real)
 from dolfinx.fem.assemble import assemble_scalar
+import physical_properties as props
 
 
 class Problem:
@@ -32,6 +33,7 @@ class Problem:
         self.freq = freq
         self.k = k
         self.mesh, self.mat_mt = self.create_mesh()
+        self.mu = self.create_mu()
 
     def create_mesh(self):
         return None
@@ -47,6 +49,9 @@ class Problem:
 
     def calc_omega(self):
         return 2 * np.pi * self.freq
+
+    def create_mu(self):
+        return None
 
 
 class Prob1(Problem):
@@ -257,6 +262,27 @@ class Prob2(Problem):
                     6: right_coil_mat_prop}
         return mat_dict
 
+    def create_mu(self):
+        # Based on https://fenicsproject.discourse.group/t/dolfinx-discontinous-expression/2582/3
+        V = FunctionSpace(self.mesh, ("Discontinuous Lagrange", 0))
+        mu = Function(V)
+        mat_mt = self.mat_mt
+
+        for i in range(V.dim):
+            if mat_mt.values[i] == 1:
+                mu.vector.setValueLocal(i, props.permiability_air)
+            elif mat_mt.values[i] == 2:
+                mu.vector.setValueLocal(i, props.permiability_iron)
+            elif mat_mt.values[i] == 3:
+                mu.vector.setValueLocal(i, props.permiability_aluminium)
+            elif mat_mt.values[i] == 4:
+                mu.vector.setValueLocal(i, props.permiability_iron)
+            elif mat_mt.values[i] == 5:
+                mu.vector.setValueLocal(i, props.permiability_copper)
+            elif mat_mt.values[i] == 6:
+                mu.vector.setValueLocal(i, props.permiability_copper)
+        return mu
+
 
 class MatProp:
     def __init__(self, name, mu, sigma, J_s):
@@ -284,23 +310,21 @@ def solver(problem):
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    dx = Measure("dx", subdomain_data=mat_mt)
+    dx_mt = Measure("dx", subdomain_data=mat_mt)
 
     a_integral_list = []
     L_integral_list = []
     for index, mat_prop in mat_dict.items():
-        if mat_prop.mu is not None:
-            a_integral_list.append(
-                (1 / mat_prop.mu) * inner(grad(A), grad(v)) * dx(index))
         if mat_prop.sigma is not None:
             a_integral_list.append(
-                - mat_prop.sigma * 1j * omega * inner(A, v) * dx(index))
+                - mat_prop.sigma * 1j * omega * inner(A, v) * dx_mt(index))
         if mat_prop.J_s is not None:
             # TODO Could easily remove assumption of J being constant.
             J_s = Constant(mesh, mat_prop.J_s)
-            L_integral_list.append(inner(J_s, v) * dx(index))
+            L_integral_list.append(inner(J_s, v) * dx_mt(index))
 
-    a = sum(a_integral_list)
+    a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx
+    a += sum(a_integral_list)
     L = sum(L_integral_list)
 
     A = Function(V)
@@ -342,7 +366,7 @@ def compute_J_e_from_A(A, problem):
 
     omega = problem.calc_omega()
     mat_dict = problem.get_mat_dict()
-    dx = Measure("dx", subdomain_data=problem.mat_mt)
+    dx_mt = Measure("dx", subdomain_data=problem.mat_mt)
 
     # The eddy current "phasor" J_e = - \sigma * i * \omega A^~
     # (see [1] pgs 235 and 242). In the code, I use A to represent A^~
@@ -350,7 +374,7 @@ def compute_J_e_from_A(A, problem):
     for index, mat_prop in mat_dict.items():
         if mat_prop.sigma is not None:
             f = - mat_prop.sigma * 1j * omega * A
-            L_integral_list.append(inner(f, v) * dx(index))
+            L_integral_list.append(inner(f, v) * dx_mt(index))
 
     a = inner(J_e, v) * ufl.dx
     L = sum(L_integral_list)
@@ -405,7 +429,7 @@ def save(v, problem, file_name, n=100, time_series=False):
 
 def compute_ave_power_loss(A, problem):
     omega = problem.calc_omega()
-    dx = Measure("dx", subdomain_data=problem.mat_mt)
+    dx_mt = Measure("dx", subdomain_data=problem.mat_mt)
     mat_dict = problem.get_mat_dict()
 
     L_integral_list = []
@@ -414,7 +438,7 @@ def compute_ave_power_loss(A, problem):
             # From pg 244 of [1]
             # NOTE Inner takes complex conjugate of secon argument, so no need
             # to e.g. get magnitude
-            L_integral_list.append(mat_prop.sigma * inner(A, A) * dx(index))
+            L_integral_list.append(mat_prop.sigma * inner(A, A) * dx_mt(index))
 
     L = sum(L_integral_list)
     ave_power_loss = omega**2 / 2 * problem.mesh.mpi_comm().allreduce(
@@ -424,7 +448,7 @@ def compute_ave_power_loss(A, problem):
 
 
 if __name__ == "__main__":
-    h = 0.00075
+    h = 0.001
     # Increase to 500 Hz to see skin effect
     freq = 50
     k = 2
