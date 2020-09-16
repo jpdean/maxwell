@@ -331,7 +331,7 @@ def solver(problem):
     a = (1 / problem.mu) * inner(grad(A), grad(v)) * ufl.dx \
         - problem.sigma * 1j * omega * inner(A, v) * ufl.dx \
         + problem.sigma * inner(A.dx(0) * vel[0] + A.dx(1) * vel[1], v) \
-            * (dx_mt(3) + dx_mt(4))  # TODO CHECK SIGN
+            * (dx_mt(3) + dx_mt(4))
 
     # NOTE Could handle J_s in a similar way as mu and sigma (i.e. DG0
     # functions defined on whole domain), but I think this way makes
