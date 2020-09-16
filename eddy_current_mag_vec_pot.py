@@ -58,7 +58,13 @@ class Problem:
         return None
 
 
+# Similar to the problem on pg 282
 class Prob1(Problem):
+    def __init__(self, h=0.01, freq=0.001, k=2):
+        # This problem has large geometry (approx 1 m) so only need a low
+        # frequency
+        super().__init__(h, freq, k)
+
     def create_mesh(self):
         # TODO Remove magic numbers
         h = self.h
@@ -118,36 +124,56 @@ class Prob1(Problem):
         values = np.zeros((1, x.shape[1]))
         return values
 
-    def get_mat_dict(self):
-        air_mat_prop = MatProp(name="Air",
-                               mu=4 * np.pi * 1e-7,
-                               sigma=None,
-                               J_s=None)
-        # Laminated -> low conductance -> set sigma to None to not
-        # include integral
-        laminated_iron_mat_prop = MatProp(name="Laminated iron",
-                                          mu=6.3e-3,
-                                          sigma=None,
-                                          J_s=None)
-        # We prescrive the total current in the coil (with J_s), so sigma set
-        # to None
-        coil_mat_prop = MatProp(name="Coil",
-                                mu=1.3e-6,
-                                sigma=None,
-                                J_s=100)
-        iron_mat_prop = MatProp(name="Iron",
-                                mu=6.3e-3,
-                                sigma=1e7,
-                                J_s=None)
+    def create_mu(self):
+        # Based on https://fenicsproject.discourse.group/t/dolfinx-discontinous-expression/2582/3
+        V = FunctionSpace(self.mesh, ("Discontinuous Lagrange", 0))
+        mu = Function(V)
+        mat_mt = self.mat_mt
 
-        mat_dict = {1: air_mat_prop,
-                    2: laminated_iron_mat_prop,
-                    3: coil_mat_prop,
-                    4: iron_mat_prop}
-        return mat_dict
+        for i in range(V.dim):
+            if mat_mt.values[i] == 1:
+                mu.vector.setValueLocal(i, props.permiability_air)
+            elif mat_mt.values[i] == 2:
+                mu.vector.setValueLocal(i, props.permiability_iron)
+            elif mat_mt.values[i] == 3:
+                mu.vector.setValueLocal(i, props.permiability_copper)
+            elif mat_mt.values[i] == 4:
+                mu.vector.setValueLocal(i, props.permiability_iron)
+        return mu
+
+    def create_sigma(self):
+        V = FunctionSpace(self.mesh, ("Discontinuous Lagrange", 0))
+        sigma = Function(V)
+        mat_mt = self.mat_mt
+
+        for i in range(V.dim):
+            if mat_mt.values[i] == 1:
+                sigma.vector.setValueLocal(i, props.conductivity_air)
+            elif mat_mt.values[i] == 2:
+                # Iron in this region is laminated so assume zero
+                # conductivity
+                sigma.vector.setValueLocal(i, 0)
+            elif mat_mt.values[i] == 3:
+                # J_s prescribed in coil, so set sigma to 0
+                sigma.vector.setValueLocal(i, 0)
+            elif mat_mt.values[i] == 4:
+                sigma.vector.setValueLocal(i, props.conductivity_iron)
+        return sigma
+
+    def get_J_s_dict(self):
+        # Prescribe J_s in left and right coils (numbered 5 and 6
+        # respectively)
+        return {3: 10000}
 
 
+# Problem similar to RR single phase induction motor. Increase
+# frequency to e.g. 500 Hz to see skin effect
 class Prob2(Problem):
+    def __init__(self, h=0.001, freq=50, k=2):
+        # This problem has large geometry (approx 1 m) so only need a low
+        # frequency
+        super().__init__(h, freq, k)
+
     def create_mesh(self):
         h = self.h
 
@@ -407,13 +433,8 @@ def compute_ave_power_loss(A, problem):
 
 
 if __name__ == "__main__":
-    h = 0.001
-    # Increase to 500 Hz to see skin effect
-    freq = 50
-    k = 2
-
     print("A")
-    problem = Prob2(h, freq, k)
+    problem = Prob1()
     A = solver(problem)
     save(A, problem, "A.xdmf", time_series=False)
 
