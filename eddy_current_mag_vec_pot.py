@@ -325,6 +325,9 @@ def solver(problem):
     dx_mt = Measure("dx", subdomain_data=mat_mt)
 
     # See [1] pg 246
+    # In [1] pg 358, it is stated that upwinding might be needed when the
+    # velocity term is added to prevent numerical difficulties.
+    # TODO Only add velocity term if problem has moving parts!
     x = SpatialCoordinate(mesh)
     omega_rotor = 2 * np.pi * 60
     vel = omega_rotor * as_vector((- x[1], x[0]))
