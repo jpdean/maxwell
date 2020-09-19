@@ -12,6 +12,7 @@ from dolfinx.mesh import locate_entities_boundary
 from dolfinx.fem import locate_dofs_topological, DirichletBC
 from ufl import TrialFunction, TestFunction, inner, grad, dx
 import numpy as np
+from postprocessing import save
 
 
 # TODO Remove
@@ -19,7 +20,7 @@ def boundary_marker(x):
     left = np.isclose(x[0], 0)
     right = np.isclose(x[0], 1)
     bottom = np.isclose(x[1], 0)
-    top = np.isclose(x[1], 1.1)
+    top = np.isclose(x[1], 1)
 
     l_r = np.logical_or(left, right)
     b_t = np.logical_or(bottom, top)
@@ -65,3 +66,4 @@ beta_dict = {1: 0}
 f = 1
 problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f)
 u = solve(problem)
+save(u, mesh, "phi.xdmf")
