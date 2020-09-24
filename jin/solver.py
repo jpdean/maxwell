@@ -7,13 +7,11 @@
 # References:
 # [1] The Finite Element Method in Electromagnetics by Jin
 
-from problems import Problem
-from meshes import create_unit_square_mesh
+from problems import ProblemFactory
 import dolfinx
 from dolfinx import FunctionSpace, Function
 from dolfinx.fem import locate_dofs_topological, DirichletBC
 from ufl import TrialFunction, TestFunction, inner, grad, dx, Measure
-import numpy as np
 from postprocessing import save
 
 # TODO Add Robin BCs
@@ -53,18 +51,6 @@ def solve(problem):
     return u
 
 
-h = 0.1
-mesh, cell_mt, facet_mt = create_unit_square_mesh(h)
-k = 1
-alpha_dict = {1: 1}
-beta_dict = {1: 0}
-f = 1
-bc_dict = {}
-bc_dict["dirichlet"] = {3: lambda x: np.zeros((1, x.shape[1])),
-                        4: lambda x: np.zeros((1, x.shape[1])),
-                        5: lambda x: np.zeros((1, x.shape[1]))}
-bc_dict["neumann"] = {2: 0.5}
-problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
-                  bc_dict)
+problem = ProblemFactory.create_Poisson_problem_1()
 u = solve(problem)
-save(u, mesh, "phi.xdmf")
+save(u, problem.get_mesh(), "phi.xdmf")
