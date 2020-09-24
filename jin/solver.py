@@ -16,19 +16,6 @@ from postprocessing import save
 
 
 # TODO Remove
-def boundary_marker(x):
-    left = np.isclose(x[0], 0)
-    right = np.isclose(x[0], 1)
-    bottom = np.isclose(x[1], 0)
-    top = np.isclose(x[1], 1)
-
-    l_r = np.logical_or(left, right)
-    b_t = np.logical_or(bottom, top)
-    l_r_b_t = np.logical_or(l_r, b_t)
-    return l_r_b_t
-
-
-# TODO Remove
 def bound_cond(x):
     # TODO Make this use meshtags
     values = np.zeros((1, x.shape[1]))
@@ -44,7 +31,9 @@ def solve(problem):
     # TODO Use meshtags
     u_bc = Function(V)
     u_bc.interpolate(bound_cond)
-    facets = locate_entities_boundary(mesh, 1, boundary_marker)
+    # NOTE Could use values in _facet_mt to get individual boundary
+    # regions, rather than all facets.
+    facets = problem._facet_mt.indices
     bdofs = locate_dofs_topological(V, 1, facets)
     bc = DirichletBC(u_bc, bdofs)
 
