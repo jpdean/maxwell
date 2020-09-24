@@ -1,5 +1,8 @@
 # Solves the generic equation given on pg 131 of [1] but
-# assuming \alpha_x = \alpha_y = \alpha
+# assuming \alpha_x = \alpha_y = \alpha. See residual form
+# on pg 152. Note that they integrate over all element
+# boundaries but mention later that only boundary elements
+# contribute (at least for Lagrange elements).
 
 # References:
 # [1] The Finite Element Method in Electromagnetics by Jin
@@ -9,11 +12,11 @@ from meshes import create_unit_square_mesh
 import dolfinx
 from dolfinx import FunctionSpace, Function
 from dolfinx.fem import locate_dofs_topological, DirichletBC
-from ufl import TrialFunction, TestFunction, inner, grad, dx
+from ufl import TrialFunction, TestFunction, inner, grad, dx, Measure
 import numpy as np
 from postprocessing import save
 
-# TODO Add Neumann BCs
+# TODO Add Robin BCs
 
 
 def solve(problem):
@@ -23,9 +26,9 @@ def solve(problem):
     v = TestFunction(V)
 
     # FIXME There is almost certainly a much better/more efficient way
-    # to do this
+    # to do this.
     bcs = []
-    for tag, u_d in problem.get_bc_dict().items():
+    for tag, u_d in problem.get_bc_dict()["dirichlet"].items():
         u_bc = Function(V)
         u_bc.interpolate(u_d)
         facet_mt = problem.get_facet_mt()
@@ -40,6 +43,10 @@ def solve(problem):
         + inner(problem.get_beta() * u, v) * dx
     L = inner(problem.get_f(), v) * dx
 
+    ds_mt = Measure("ds", subdomain_data=problem.get_facet_mt())
+    for tag, g in problem.get_bc_dict()["neumann"].items():
+        L += inner(g, v) * ds_mt(tag)
+
     u = Function(V)
     dolfinx.solve(a == L, u, bcs, petsc_options={"ksp_type": "preonly",
                                                  "pc_type": "lu"})
@@ -52,10 +59,11 @@ k = 1
 alpha_dict = {1: 1}
 beta_dict = {1: 0}
 f = 1
-bc_dict = {2: lambda x: np.zeros((1, x.shape[1])),
-           3: lambda x: np.zeros((1, x.shape[1])),
-           4: lambda x: np.zeros((1, x.shape[1])),
-           5: lambda x: np.zeros((1, x.shape[1]))}
+bc_dict = {}
+bc_dict["dirichlet"] = {3: lambda x: np.zeros((1, x.shape[1])),
+                        4: lambda x: np.zeros((1, x.shape[1])),
+                        5: lambda x: np.zeros((1, x.shape[1]))}
+bc_dict["neumann"] = {2: 0.5}
 problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
                   bc_dict)
 u = solve(problem)
