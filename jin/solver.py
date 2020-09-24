@@ -51,6 +51,6 @@ def solve(problem):
     return u
 
 
-problem = ProblemFactory.create_Poisson_problem_1()
-u = solve(problem)
-save(u, problem.get_mesh(), "phi.xdmf")
+# problem = ProblemFactory.create_Poisson_problem_2()
+# u = solve(problem)
+# save(u, problem.get_mesh(), "phi.xdmf")

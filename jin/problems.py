@@ -4,6 +4,7 @@
 from dolfinx import FunctionSpace, Function
 from meshes import create_unit_square_mesh
 import numpy as np
+from ufl import sin, cos, div, grad, pi, SpatialCoordinate
 
 
 class Problem:
@@ -50,10 +51,8 @@ class Problem:
 
 class ProblemFactory:
     @staticmethod
-    def create_Poisson_problem_1():
-        h = 0.1
+    def create_Poisson_problem_1(h=0.1, k=1):
         mesh, cell_mt, facet_mt = create_unit_square_mesh(h)
-        k = 1
         alpha_dict = {1: 1}
         beta_dict = {1: 0}
         f = 1
@@ -61,6 +60,24 @@ class ProblemFactory:
         bc_dict["dirichlet"] = {4: lambda x: np.zeros((1, x.shape[1])),
                                 5: lambda x: np.zeros((1, x.shape[1]))}
         bc_dict["neumann"] = {2: 0.5, 3: -0.25}
+        problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
+                          bc_dict)
+        return problem
+
+    @staticmethod
+    def create_Poisson_problem_2(h=0.1, k=1):
+        mesh, cell_mt, facet_mt = create_unit_square_mesh(h)
+        alpha_dict = {1: 1}
+        beta_dict = {1: 0}
+        x = SpatialCoordinate(mesh)
+        u = sin(pi * x[0]) * cos(pi * x[1])
+        f = - div(grad(u))
+        bc_dict = {}
+        bc_dict["dirichlet"] = {2: lambda x: np.sin(np.pi * x[0]),
+                                3: lambda x: np.zeros((1, x.shape[1])),
+                                4: lambda x: - np.sin(np.pi * x[0]),
+                                5: lambda x: np.zeros((1, x.shape[1]))}
+        bc_dict["neumann"] = {}
         problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
                           bc_dict)
         return problem
