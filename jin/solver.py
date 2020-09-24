@@ -8,18 +8,12 @@ from problems import Problem
 from meshes import create_unit_square_mesh
 import dolfinx
 from dolfinx import FunctionSpace, Function
-from dolfinx.mesh import locate_entities_boundary
 from dolfinx.fem import locate_dofs_topological, DirichletBC
 from ufl import TrialFunction, TestFunction, inner, grad, dx
 import numpy as np
 from postprocessing import save
 
-
-# TODO Remove
-def bound_cond(x):
-    # TODO Make this use meshtags
-    values = np.zeros((1, x.shape[1]))
-    return values
+# TODO Add Neumann BCs
 
 
 def solve(problem):
@@ -28,22 +22,27 @@ def solve(problem):
     u = TrialFunction(V)
     v = TestFunction(V)
 
-    # TODO Use meshtags
-    u_bc = Function(V)
-    u_bc.interpolate(bound_cond)
-    # NOTE Could use values in _facet_mt to get individual boundary
-    # regions, rather than all facets.
-    facets = problem._facet_mt.indices
-    bdofs = locate_dofs_topological(V, 1, facets)
-    bc = DirichletBC(u_bc, bdofs)
+    # FIXME There is almost certainly a much better/more efficient way
+    # to do this
+    bcs = []
+    for tag, u_d in problem.get_bc_dict().items():
+        u_bc = Function(V)
+        u_bc.interpolate(u_d)
+        facet_mt = problem.get_facet_mt()
+        facets = []
+        for i in range(len(facet_mt.indices)):
+            if facet_mt.values[i] == tag:
+                facets.append(facet_mt.indices[i])
+        bdofs = locate_dofs_topological(V, 1, facets)
+        bcs.append(DirichletBC(u_bc, bdofs))
 
     a = inner(1 / problem.get_alpha() * grad(u), grad(v)) * dx \
         + inner(problem.get_beta() * u, v) * dx
     L = inner(problem.get_f(), v) * dx
 
     u = Function(V)
-    dolfinx.solve(a == L, u, bc, petsc_options={"ksp_type": "preonly",
-                                                "pc_type": "lu"})
+    dolfinx.solve(a == L, u, bcs, petsc_options={"ksp_type": "preonly",
+                                                 "pc_type": "lu"})
     return u
 
 
@@ -53,6 +52,11 @@ k = 1
 alpha_dict = {1: 1}
 beta_dict = {1: 0}
 f = 1
-problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f)
+bc_dict = {2: lambda x: np.zeros((1, x.shape[1])),
+           3: lambda x: np.zeros((1, x.shape[1])),
+           4: lambda x: np.zeros((1, x.shape[1])),
+           5: lambda x: np.zeros((1, x.shape[1]))}
+problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
+                  bc_dict)
 u = solve(problem)
 save(u, mesh, "phi.xdmf")
