@@ -37,7 +37,7 @@ def solve(problem):
         bdofs = locate_dofs_topological(V, 1, facets)
         bcs.append(DirichletBC(u_bc, bdofs))
 
-    a = inner(1 / problem.get_alpha() * grad(u), grad(v)) * dx \
+    a = inner(problem.get_alpha() * grad(u), grad(v)) * dx \
         + inner(problem.get_beta() * u, v) * dx
     L = inner(problem.get_f(), v) * dx
 
