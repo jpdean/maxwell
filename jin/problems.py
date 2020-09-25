@@ -1,8 +1,11 @@
 # TODO Reference Jorgen's post on his website
 
+# References:
+# [1] The Finite Element Method in Electromagnetics by Jin
 
-from dolfinx import FunctionSpace, Function
-from meshes import create_unit_square_mesh
+from dolfinx import FunctionSpace, Function, Constant
+from meshes import (create_unit_square_mesh,
+                    create_shielded_microstrip_line_mesh)
 import numpy as np
 from ufl import sin, cos, div, grad, pi, SpatialCoordinate
 
@@ -78,6 +81,24 @@ class ProblemFactory:
                                 4: lambda x: - np.sin(np.pi * x[0]),
                                 5: lambda x: np.zeros((1, x.shape[1]))}
         bc_dict["neumann"] = {}
+        problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
+                          bc_dict)
+        return problem
+
+    # Problem based on pg 272 of [1]
+    @staticmethod
+    def create_shielded_microstrip_line_problem(h=0.1, k=1):
+        mesh, cell_mt, facet_mt = create_shielded_microstrip_line_mesh(h)
+        eps_r = 8.8
+        eps_0 = 8.85418782e-12
+        alpha_dict = {1: eps_r * eps_0, 2: eps_0}
+        beta_dict = {1: 0, 2: 0}
+        rho = Constant(mesh, 0)  # FIXME Use constant
+        f = rho / eps_0
+        bc_dict = {}
+        bc_dict["dirichlet"] = {1: lambda x: np.zeros((1, x.shape[1])),
+                                2: lambda x: np.ones((1, x.shape[1]))}
+        bc_dict["neumann"] = {3: Constant(mesh, 0)}  # FIXME Use constant
         problem = Problem(mesh, cell_mt, facet_mt, k, alpha_dict, beta_dict, f,
                           bc_dict)
         return problem

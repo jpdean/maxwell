@@ -51,6 +51,6 @@ def solve(problem):
     return u
 
 
-# problem = ProblemFactory.create_Poisson_problem_2()
+# problem = ProblemFactory.create_shielded_microstrip_line_problem(0.02)
 # u = solve(problem)
 # save(u, problem.get_mesh(), "phi.xdmf")
