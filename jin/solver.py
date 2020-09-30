@@ -24,7 +24,8 @@ def solve(problem):
     v = TestFunction(V)
 
     # FIXME There is almost certainly a much better/more efficient way
-    # to do this.
+    # to do this. TODO See Jorgens RR Maxwell demo! I has a better way
+    # of doing this
     bcs = []
     for tag, u_d in problem.get_bc_dict()["dirichlet"].items():
         u_bc = Function(V)
