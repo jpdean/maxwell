@@ -9,7 +9,8 @@ from sympy import sin, cos, pi, simplify
 
 R = CoordSys3D("R")
 
-A = R.y * (1 - R.y) * R.i
+# A = R.y * (1 - R.y) * R.i
+A = sin(pi * R.y) * sin(pi * R.z) * R.i
 
 f = simplify(curl(curl(A)))
 print(f"f = {f}")
