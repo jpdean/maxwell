@@ -1,6 +1,5 @@
 # TODO Get 3D working
 # TODO Add references
-# TODO Make problem factory
 
 from dolfinx import (UnitSquareMesh, DirichletBC, Function,
                      FunctionSpace, Constant, solve,
@@ -95,6 +94,7 @@ def compute_B(A, k, mesh):
     return B
 
 
+# FIXME Move boundary markers to more sensible place
 def square_bound_marker(x):
     left = np.isclose(x[0], 0)
     right = np.isclose(x[0], 1)
@@ -107,6 +107,7 @@ def square_bound_marker(x):
     return np.logical_or(l_r, b_t)
 
 
+# FIXME Move boundary markers to more sensible place
 def cube_bound_marker(x):
     left = np.isclose(x[0], 0)
     right = np.isclose(x[0], 1)
@@ -124,35 +125,71 @@ def cube_bound_marker(x):
     return np.logical_or(l_r_b_t, b_f)
 
 
-# Problem 1
-# k = 1
-# mesh = UnitSquareMesh(MPI.COMM_WORLD, 64, 64)
-# # Right hand side (see man_sol.py)
-# f = Constant(mesh, (2, 0))
+# FIXME Get ufl to compute f and B from A for checking solution
+# TODO Make problem factory
 
+# 2D Problems
+# Problem 1
+k = 1
+n = 32
+mesh = UnitSquareMesh(MPI.COMM_WORLD, n, n)
+f = Constant(mesh, (1, 0))
+A = solve_problem(k, mesh, f, square_bound_marker)
+save_function(A, mesh, "A.xdmf")
+B = compute_B(A, k - 1, mesh)
+save_function(B, mesh, "B.xdmf")
+x = SpatialCoordinate(mesh)
+B_e = x[1] - 0.5
+e = L2_norm(B - B_e)
+print(f"L2-norm of error in B = {e}")
+
+# Problem 2
+# k = 1
+# n = 64
+# mesh = UnitSquareMesh(MPI.COMM_WORLD, n, n)
+# x = SpatialCoordinate(mesh)
+# f = as_vector((pi**2 * sin(x[1] * pi), 0))
 # A = solve_problem(k, mesh, f, square_bound_marker)
 # save_function(A, mesh, "A.xdmf")
 # B = compute_B(A, k - 1, mesh)
 # save_function(B, mesh, "B.xdmf")
-
-# # Exact B from man_sol.py
-# x = SpatialCoordinate(mesh)
-# B_e = 2 * x[1] - 1
+# B_e = - pi * cos(x[1] * pi)
 # e = L2_norm(B - B_e)
 # print(f"L2-norm of error in B = {e}")
 
-# Problem 2
-k = 1
-n = 48
-mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
-x = SpatialCoordinate(mesh)
-f = as_vector((2 * pi**2 * sin(x[1] * pi) * sin(x[2] * pi), 0, 0))
-A = solve_problem(k, mesh, f, cube_bound_marker)
-save_function(A, mesh, "A.xdmf")
-B = compute_B(A, k - 1, mesh)
-save_function(B, mesh, "B.xdmf")
-B_e = as_vector((0,
-                 pi * sin(x[1] * pi) * cos(x[2] * pi),
-                 - pi * sin(x[2] * pi) * cos(x[1] * pi)))
-e = L2_norm(B - B_e)
-print(f"L2-norm of error in B = {e}")
+# 3D Problems
+# Problem 3
+# k = 1
+# n = 32
+# mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
+# x = SpatialCoordinate(mesh)
+# f = as_vector((- 2 * x[1]**2 + 2 * x[1] - 2 * x[2]**2 + 2 * x[2],
+#                0,
+#                0))
+# A = solve_problem(k, mesh, f, cube_bound_marker)
+# save_function(A, mesh, "A.xdmf")
+# B = compute_B(A, k - 1, mesh)
+# save_function(B, mesh, "B.xdmf")
+# B_e = as_vector((0,
+#                  x[1] * (x[1] - 1) * (2 * x[2] - 1),
+#                  x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
+# e = L2_norm(B - B_e)
+# print(f"L2-norm of error in B = {e}")
+
+# Problem 4
+# k = 1
+# n = 16
+# mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
+# x = SpatialCoordinate(mesh)
+# f = as_vector((2 * pi**2 * sin(x[1] * pi) * sin(x[2] * pi),
+#                0,
+#                0))
+# A = solve_problem(k, mesh, f, cube_bound_marker)
+# save_function(A, mesh, "A.xdmf")
+# B = compute_B(A, k - 1, mesh)
+# save_function(B, mesh, "B.xdmf")
+# B_e = as_vector((0,
+#                  pi * sin(x[1] * pi) * cos(x[2] * pi),
+#                  - pi * sin(x[2] * pi) * cos(x[1] * pi)))
+# e = L2_norm(B - B_e)
+# print(f"L2-norm of error in B = {e}")
