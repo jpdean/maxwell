@@ -70,7 +70,8 @@ def solve_problem(k, mesh, f, bound_marker):
     # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
     solve(a == L, A, bc, petsc_options={"ksp_type": "cg",
                                         "pc_type": "jacobi",
-                                        "ksp_rtol": 1e-12})
+                                        "ksp_rtol": 1e-12,
+                                        "ksp_monitor": None})
     return A
 
 
