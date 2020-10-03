@@ -41,34 +41,34 @@ def L2_norm(v):
                                             op=MPI.SUM))
 
 
-def solve_problem(k, mesh, f, bound_marker):
+def solve_problem(k, mesh, T_0, bound_marker):
     V = FunctionSpace(mesh, ("N1curl", k))
 
     # Create function and set all dofs to 0
-    A_d = Function(V)
-    A_d.vector.set(0.0)
-    # Locate boundary facets
-    d = mesh.topology.dim
-    facets = locate_entities_boundary(mesh, d - 1, bound_marker)
-    # Locate boundary dofs
-    dofs = locate_dofs_topological(V, d - 1, facets)
-    # Apply boundary condition. NOTE Since these are edge elements,
-    # this means that we are setting the tangential component of
-    # A to zero on the boundary. The normal component is not
-    # constrained (look at the basis funcs to see this)
-    bc = DirichletBC(A_d, dofs)
+    # A_d = Function(V)
+    # A_d.vector.set(0.0)
+    # # Locate boundary facets
+    # d = mesh.topology.dim
+    # facets = locate_entities_boundary(mesh, d - 1, bound_marker)
+    # # Locate boundary dofs
+    # dofs = locate_dofs_topological(V, d - 1, facets)
+    # # Apply boundary condition. NOTE Since these are edge elements,
+    # # this means that we are setting the tangential component of
+    # # A to zero on the boundary. The normal component is not
+    # # constrained (look at the basis funcs to see this)
+    # bc = DirichletBC(A_d, dofs)
 
     A = TrialFunction(V)
     v = TestFunction(V)
 
     a = inner(curl(A), curl(v)) * dx
-    L = inner(f, v) * dx
+    L = inner(T_0, curl(v)) * dx
 
     A = Function(V)
     # NOTE That A is not unique because of the nullspace of the curl operator
     # i.e. curl(grad(\phi)) = 0 for any \phi, so for any A that is a solution,
     # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
-    solve(a == L, A, bc, petsc_options={"ksp_type": "cg",
+    solve(a == L, A, [], petsc_options={"ksp_type": "cg",
                                         "pc_type": "jacobi",
                                         "ksp_rtol": 1e-12,
                                         "ksp_monitor": None})
@@ -131,18 +131,18 @@ def cube_bound_marker(x):
 
 # 2D Problems
 # Problem 1
-k = 1
-n = 32
-mesh = UnitSquareMesh(MPI.COMM_WORLD, n, n)
-f = Constant(mesh, (1, 0))
-A = solve_problem(k, mesh, f, square_bound_marker)
-save_function(A, mesh, "A.xdmf")
-B = compute_B(A, k - 1, mesh)
-save_function(B, mesh, "B.xdmf")
-x = SpatialCoordinate(mesh)
-B_e = x[1] - 0.5
-e = L2_norm(B - B_e)
-print(f"L2-norm of error in B = {e}")
+# k = 1
+# n = 32
+# mesh = UnitSquareMesh(MPI.COMM_WORLD, n, n)
+# x = SpatialCoordinate(mesh)
+# T_0 = as_vector()
+# A = solve_problem(k, mesh, f, square_bound_marker)
+# save_function(A, mesh, "A.xdmf")
+# B = compute_B(A, k - 1, mesh)
+# save_function(B, mesh, "B.xdmf")
+# B_e = x[1] - 0.5
+# e = L2_norm(B - B_e)
+# print(f"L2-norm of error in B = {e}")
 
 # Problem 2
 # k = 1
@@ -160,26 +160,26 @@ print(f"L2-norm of error in B = {e}")
 
 # 3D Problems
 # Problem 3
-# k = 1
-# n = 32
-# mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
-# x = SpatialCoordinate(mesh)
-# f = as_vector((- 2 * x[1]**2 + 2 * x[1] - 2 * x[2]**2 + 2 * x[2],
-#                0,
-#                0))
-# A = solve_problem(k, mesh, f, cube_bound_marker)
-# save_function(A, mesh, "A.xdmf")
-# B = compute_B(A, k - 1, mesh)
-# save_function(B, mesh, "B.xdmf")
-# B_e = as_vector((0,
-#                  x[1] * (x[1] - 1) * (2 * x[2] - 1),
-#                  x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
-# e = L2_norm(B - B_e)
-# print(f"L2-norm of error in B = {e}")
+k = 1
+n = 32
+mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
+x = SpatialCoordinate(mesh)
+T_0 = as_vector((0,
+                 x[1] * (x[1] - 1) * (2 * x[2] - 1),
+                 x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
+A = solve_problem(k, mesh, T_0, cube_bound_marker)
+save_function(A, mesh, "A.xdmf")
+B = compute_B(A, k - 1, mesh)
+save_function(B, mesh, "B.xdmf")
+B_e = as_vector((0,
+                 x[1] * (x[1] - 1) * (2 * x[2] - 1),
+                 x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
+e = L2_norm(B - B_e)
+print(f"L2-norm of error in B = {e}")
 
 # Problem 4
 # k = 1
-# n = 16
+# n = 32
 # mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
 # x = SpatialCoordinate(mesh)
 # f = as_vector((2 * pi**2 * sin(x[1] * pi) * sin(x[2] * pi),
