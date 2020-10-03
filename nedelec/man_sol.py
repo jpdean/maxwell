@@ -1,30 +1,30 @@
-# Computes manufactured solutions to curl(curl(A)) = f
+# Computes manufactured solutions to problem (1)-(2) in [1] with
+# constitutive equations (7) and impressed field (9).
 
-import sympy
+# References
+# [1] Oszkar Biro, "Edge element formulations of eddy current problems"
 
 from sympy import symbols
-from sympy.vector import CoordSys3D, laplacian, gradient, divergence, curl
+from sympy.vector import CoordSys3D, curl
 from sympy import sin, cos, pi, simplify
 
 
 R = CoordSys3D("R")
+mu = symbols("mu")
 
-# 2D problems
 # Problem 1
-A = 0.5 * R.y * (1 - R.y) * R.i
-
-# Problem 2
-# A = sin(pi * R.y) * R.i
-
-# 3D problems
-# Problem 3
-# A = R.y * (1 - R.y) * R.z * (1 - R.z) * R.i
-
-# Problem 4
-# A = sin(pi * R.y) * sin(pi * R.z) * R.i
-
-f = simplify(curl(curl(A)))
-print(f"f = {f}")
+A = sin(pi * R.y) * R.i + sin(pi * R.z) * R.j + sin(pi * R.x) * R.k 
 
 B = simplify(curl(A))
 print(f"B = {B}")
+
+H = simplify(1 / mu * B)
+print(f"H = {H}")
+
+# From (1) and (9), curl(H) = curl(T_0), therefore one option is to just
+# choose T_0 = H
+T_0 = H
+print(f"T_0 = {T_0}")
+
+J_0 = simplify(curl(T_0))
+print(f"J_0 = {J_0}")

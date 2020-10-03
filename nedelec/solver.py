@@ -1,4 +1,5 @@
 # TODO Add references
+# TODO Add mu!
 
 from dolfinx import (Function,  FunctionSpace, solve,
                      UnitCubeMesh, VectorFunctionSpace)
@@ -6,7 +7,7 @@ import numpy as np
 from mpi4py import MPI
 from dolfinx.fem import assemble_scalar
 from ufl import (TrialFunction, TestFunction, inner, dx, curl,
-                 SpatialCoordinate, sin, cos, pi, as_vector)
+                 SpatialCoordinate, cos, pi, as_vector)
 from dolfinx.io import XDMFFile
 
 
@@ -83,35 +84,18 @@ def compute_B(A, k, mesh):
 # Problem 1
 k = 1
 n = 32
+mu = 1
 mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
 x = SpatialCoordinate(mesh)
-T_0 = as_vector((0,
-                 x[1] * (x[1] - 1) * (2 * x[2] - 1),
-                 x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
+T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
+                 - pi * cos(x[0] * pi) / mu,
+                 - pi * cos(x[1] * pi) / mu))
 A = solve_problem(k, mesh, T_0)
 save_function(A, mesh, "A.xdmf")
 B = compute_B(A, k - 1, mesh)
 save_function(B, mesh, "B.xdmf")
-B_e = as_vector((0,
-                 x[1] * (x[1] - 1) * (2 * x[2] - 1),
-                 x[2] * (1 - 2 * x[1]) * (x[2] - 1)))
+B_e = as_vector((- pi * cos(x[2] * pi),
+                 - pi * cos(x[0] * pi),
+                 - pi * cos(x[1] * pi)))
 e = L2_norm(B - B_e)
 print(f"L2-norm of error in B = {e}")
-
-# Problem 2
-# k = 1
-# n = 32
-# mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
-# x = SpatialCoordinate(mesh)
-# f = as_vector((2 * pi**2 * sin(x[1] * pi) * sin(x[2] * pi),
-#                0,
-#                0))
-# A = solve_problem(k, mesh, f, cube_bound_marker)
-# save_function(A, mesh, "A.xdmf")
-# B = compute_B(A, k - 1, mesh)
-# save_function(B, mesh, "B.xdmf")
-# B_e = as_vector((0,
-#                  pi * sin(x[1] * pi) * cos(x[2] * pi),
-#                  - pi * sin(x[2] * pi) * cos(x[1] * pi)))
-# e = L2_norm(B - B_e)
-# print(f"L2-norm of error in B = {e}")
