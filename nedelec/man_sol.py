@@ -13,7 +13,7 @@ R = CoordSys3D("R")
 mu = symbols("mu")
 
 # Problem 1
-A = sin(pi * R.y) * R.i + sin(pi * R.z) * R.j + sin(pi * R.x) * R.k 
+A = sin(pi * R.y) * R.i + sin(pi * R.z) * R.j + sin(pi * R.x) * R.k
 
 B = simplify(curl(A))
 print(f"B = {B}")
