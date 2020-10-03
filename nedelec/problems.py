@@ -9,15 +9,15 @@ from util import save_function, L2_norm
 
 
 class Problem():
-    def __init__(self, k, mesh, mu, T_0, B_e):
-        self.k = k
+    def __init__(self, mesh, k, mu, T_0, B_e):
         self.mesh = mesh
+        self.k = k
         self.mu = mu
         self.T_0 = T_0
         self.B_e = B_e
 
 
-def create_problem_1(k, h, mu):
+def create_problem_1(h, k, mu):
     n = round(1 / h)
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
@@ -27,7 +27,7 @@ def create_problem_1(k, h, mu):
     B_e = as_vector((- pi * cos(x[2] * pi),
                      - pi * cos(x[0] * pi),
                      - pi * cos(x[1] * pi)))
-    return Problem(k, mesh, mu, T_0, B_e)
+    return Problem(mesh, k, mu, T_0, B_e)
 
 
 if __name__ == "__main__":
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     k = 1
     h = 1 / 32
     mu = 1
-    problem = create_problem_1(k, h, mu)
+    problem = create_problem_1(h, k, mu)
     A = solve_problem(problem)
     save_function(A, problem.mesh, "A.xdmf")
     B = compute_B(A, k - 1, problem.mesh)
