@@ -1,49 +1,19 @@
 # TODO Add references
 # TODO Add mu!
 
-from dolfinx import (Function,  FunctionSpace, solve,
-                     UnitCubeMesh, VectorFunctionSpace)
-import numpy as np
-from mpi4py import MPI
-from dolfinx.fem import assemble_scalar
-from ufl import (TrialFunction, TestFunction, inner, dx, curl,
-                 SpatialCoordinate, cos, pi, as_vector)
-from dolfinx.io import XDMFFile
+from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
+from ufl import TrialFunction, TestFunction, inner, dx, curl
+from util import project
 
 
-def project(f, V):
-    """Projects the function f onto the space V
-    """
-    u = TrialFunction(V)
-    v = TestFunction(V)
-
-    a = inner(u, v) * dx
-    L = inner(f, v) * dx
-
-    u = Function(V)
-    solve(a == L, u, [], petsc_options={"ksp_type": "cg"})
-    return u
-
-
-def save_function(v, mesh, filename):
-    with XDMFFile(MPI.COMM_WORLD, filename, "w") as f:
-        f.write_mesh(mesh)
-        f.write_function(v)
-
-
-def L2_norm(v):
-    """Computes the L2-norm of v
-    """
-    return np.sqrt(MPI.COMM_WORLD.allreduce(assemble_scalar(inner(v, v) * dx),
-                                            op=MPI.SUM))
-
-
-def solve_problem(k, mesh, mu, T_0):
-    V = FunctionSpace(mesh, ("N1curl", k))
+def solve_problem(problem):
+    V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
     A = TrialFunction(V)
     v = TestFunction(V)
 
+    mu = problem.mu
+    T_0 = problem.T_0
     a = inner(1 / mu * curl(A), curl(v)) * dx
     L = inner(T_0, curl(v)) * dx
 
@@ -76,26 +46,3 @@ def compute_B(A, k, mesh):
         V = VectorFunctionSpace(mesh, ("DG", k))
         B = project(curl(A), V)
     return B
-
-
-# FIXME Get ufl to compute f and B from A for checking solution
-# TODO Make problem factory
-
-# Problem 1
-k = 1
-n = 32
-mu = 1
-mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
-x = SpatialCoordinate(mesh)
-T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
-                 - pi * cos(x[0] * pi) / mu,
-                 - pi * cos(x[1] * pi) / mu))
-A = solve_problem(k, mesh, mu, T_0)
-save_function(A, mesh, "A.xdmf")
-B = compute_B(A, k - 1, mesh)
-save_function(B, mesh, "B.xdmf")
-B_e = as_vector((- pi * cos(x[2] * pi),
-                 - pi * cos(x[0] * pi),
-                 - pi * cos(x[1] * pi)))
-e = L2_norm(B - B_e)
-print(f"L2-norm of error in B = {e}")
