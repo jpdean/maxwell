@@ -38,13 +38,13 @@ def L2_norm(v):
                                             op=MPI.SUM))
 
 
-def solve_problem(k, mesh, T_0):
+def solve_problem(k, mesh, mu, T_0):
     V = FunctionSpace(mesh, ("N1curl", k))
 
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    a = inner(curl(A), curl(v)) * dx
+    a = inner(1 / mu * curl(A), curl(v)) * dx
     L = inner(T_0, curl(v)) * dx
 
     A = Function(V)
@@ -90,7 +90,7 @@ x = SpatialCoordinate(mesh)
 T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
                  - pi * cos(x[0] * pi) / mu,
                  - pi * cos(x[1] * pi) / mu))
-A = solve_problem(k, mesh, T_0)
+A = solve_problem(k, mesh, mu, T_0)
 save_function(A, mesh, "A.xdmf")
 B = compute_B(A, k - 1, mesh)
 save_function(B, mesh, "B.xdmf")
