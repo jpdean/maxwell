@@ -56,6 +56,7 @@ def create_problem_2(h, k):
     cell_mt = entity_mesh_tags(mesh, pygmsh_mesh, "tetra")
     facet_mt = entity_mesh_tags(mesh, pygmsh_mesh, "triangle")
 
+    # TODO Figure out why setting mu=1 still gives suddent field change.
     V = FunctionSpace(mesh, ("Discontinuous Lagrange", 0))
     mu_0 = 4 * np.pi * 1e-7
     mu_magnet = 10 * mu_0
