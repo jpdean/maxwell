@@ -2,7 +2,7 @@
 # TODO Add mu!
 
 from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
-from ufl import TrialFunction, TestFunction, inner, dx, curl, Measure
+from ufl import TrialFunction, TestFunction, inner, dx, curl
 from util import project
 
 
@@ -16,8 +16,7 @@ def solve_problem(problem):
     T_0 = problem.T_0
     a = inner(1 / mu * curl(A), curl(v)) * dx
 
-    dx_mt = Measure("dx", subdomain_data=problem.cell_mt)
-    L = inner(T_0, curl(v)) * dx_mt(2)
+    L = inner(T_0, curl(v)) * dx
 
     A = Function(V)
     # NOTE That A is not unique because of the nullspace of the curl operator
