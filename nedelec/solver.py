@@ -1,5 +1,5 @@
 # TODO Add references
-# TODO Add mu!
+# TODO Add Homegeneous Dirichlet BC's!
 
 from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
 from ufl import TrialFunction, TestFunction, inner, dx, curl
