@@ -5,26 +5,44 @@
 # [1] Oszkar Biro, "Edge element formulations of eddy current problems"
 
 from sympy import symbols
-from sympy.vector import CoordSys3D, curl
+from sympy.vector import CoordSys3D, curl, gradient, divergence
 from sympy import sin, cos, pi, simplify
 
 
-R = CoordSys3D("R")
-mu = symbols("mu")
+# R = CoordSys3D("R")
+# mu = symbols("mu")
 
-# Problem 1
-A = sin(pi * R.y) * R.i + sin(pi * R.z) * R.j + sin(pi * R.x) * R.k
+# # Problem 1
+# A = sin(pi * R.y) * R.i + sin(pi * R.z) * R.j + sin(pi * R.x) * R.k
+
+# B = simplify(curl(A))
+# print(f"B = {B}")
+
+# H = simplify(1 / mu * B)
+# print(f"H = {H}")
+
+# # From (1) and (9), curl(H) = curl(T_0), therefore one option is to just
+# # choose T_0 = H
+# T_0 = H
+# print(f"T_0 = {T_0}")
+
+# J_0 = simplify(curl(T_0))
+# print(f"J_0 = {J_0}")
+
+
+# Conducting problems
+R = CoordSys3D("R")
+mu, sigma, omega = symbols("mu sigma omega")
+A = sin(pi * R.y) * sin(pi * R.z) * R.i
+V = R.x
 
 B = simplify(curl(A))
 print(f"B = {B}")
 
-H = simplify(1 / mu * B)
-print(f"H = {H}")
-
-# From (1) and (9), curl(H) = curl(T_0), therefore one option is to just
-# choose T_0 = H
-T_0 = H
-print(f"T_0 = {T_0}")
-
-J_0 = simplify(curl(T_0))
+J_0 = simplify(curl(1 / mu * curl(A)) +
+               1j * omega * sigma * A +
+               1j * omega * sigma * gradient(V))
 print(f"J_0 = {J_0}")
+
+zero = - divergence(1j * omega * sigma * (A + gradient(V)))
+print(simplify(zero))
