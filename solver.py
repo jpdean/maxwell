@@ -3,7 +3,8 @@
 # References
 # [1] Oszkar Biro, "Edge element formulations of eddy current problems"
 
-# TODO Add Homegeneous Dirichlet BC's!
+# TODO Solver currently assumes homogeneous Neumann BCs everywhere. Add
+# ability to use more complicated BCs
 
 from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
 from ufl import TrialFunction, TestFunction, inner, dx, curl
@@ -17,7 +18,6 @@ def solve_problem(problem):
     Returns:
         A: The magnetic vector potential
     """
-    # NOTE Currently assumes homogeneous Neumann BCs
     V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
     A = TrialFunction(V)
@@ -34,7 +34,7 @@ def solve_problem(problem):
     # i.e. curl(grad(\phi)) = 0 for any \phi, so for any A that is a solution,
     # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
     # TODO Set up solver manually
-    # TODO Get AMS working properly
+    # TODO Use AMS
     solve(a == L, A, [], petsc_options={"ksp_type": "cg",
                                         "pc_type": "icc",
                                         "ksp_rtol": 1e-12,
