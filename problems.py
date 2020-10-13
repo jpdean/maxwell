@@ -10,6 +10,16 @@ from util import save_function, L2_norm
 
 
 class Problem():
+    """Simple class representing a problem.
+    Args:
+        mesh: The mesh
+        k: Degree of the function space
+        mu: Permeability
+        T_0: Impressed magnetic field (due to impressed current
+             density)
+        B_e: Exact solution for the B field (None if no exact
+             solution)
+    """
     def __init__(self, mesh, k, mu, T_0, B_e):
         self.mesh = mesh
         self.k = k
@@ -19,6 +29,12 @@ class Problem():
 
 
 def create_problem_1(h, k, mu):
+    """Create problem 1 from man_sol.py
+    Args:
+        h: Characteristic cell size
+        k: Degree of function space
+        mu: Permeability
+    """
     n = round(1 / h)
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)

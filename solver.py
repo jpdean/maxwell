@@ -1,5 +1,10 @@
-# TODO Add references
-# TODO Add Homegeneous Dirichlet BC's!
+# Solver for the magnetostatic A formulation from [1]
+
+# References
+# [1] Oszkar Biro, "Edge element formulations of eddy current problems"
+
+# TODO Solver currently assumes homogeneous Neumann BCs everywhere. Add
+# ability to use more complicated BCs
 
 from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
 from ufl import TrialFunction, TestFunction, inner, dx, curl
@@ -7,7 +12,12 @@ from util import project
 
 
 def solve_problem(problem):
-    # TODO Currently assumes homogeneous Neumann BCs
+    """Solves a magnetostatic problem.
+    Args:
+        problem: A problem created by problems.py
+    Returns:
+        A: The magnetic vector potential
+    """
     V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
     A = TrialFunction(V)
@@ -24,7 +34,7 @@ def solve_problem(problem):
     # i.e. curl(grad(\phi)) = 0 for any \phi, so for any A that is a solution,
     # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
     # TODO Set up solver manually
-    # TODO Get AMS working properly
+    # TODO Use AMS
     solve(a == L, A, [], petsc_options={"ksp_type": "cg",
                                         "pc_type": "icc",
                                         "ksp_rtol": 1e-12,
@@ -33,17 +43,15 @@ def solve_problem(problem):
 
 
 def compute_B(A, k, mesh):
-    """Computes the magnetic field, B, from the magnetic vector potential, A.
-    k is the degree of the space, and should be 1 less that the degree of the
-    space for A.
+    """Computes the magnetic field.
+    Args:
+        A: Magnetic vector potential
+        k: Degree of DG space for B
+        mesh: The mesh
+    Returns:
+        B: The magnetic flux density
     """
-    # TODO Get k from A somehow and use k - 1 in the function space definition,
-    # rather than having to do it manually
-    if mesh.topology.dim == 2:
-        # Function space for B
-        V = FunctionSpace(mesh, ("DG", k))
-        B = project(A[1].dx(0) - A[0].dx(1), V)
-    elif mesh.topology.dim == 3:
-        V = VectorFunctionSpace(mesh, ("DG", k))
-        B = project(curl(A), V)
+    # TODO Get k from A somehow and use k - 1 for degree of V
+    V = VectorFunctionSpace(mesh, ("DG", k))
+    B = project(curl(A), V)
     return B

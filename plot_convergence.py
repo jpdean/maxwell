@@ -8,8 +8,12 @@ import matplotlib.pyplot as plt
 import pickle
 
 
-def compute_conv_rate(hs, l2_errors):
-    r = np.log(l2_errors[-1] / l2_errors[-2]) / \
+def compute_conv_rate(hs, errors):
+    """Computes convergence rate.
+    Args:
+        hs: List of characteristic cell sizes
+        errors: List of errors"""
+    r = np.log(errors[-1] / errors[-2]) / \
         np.log(hs[-1] / hs[-2])
     return r
 
