@@ -10,9 +10,9 @@ from util import L2_norm
 # Problem
 prob_gen = problems.create_problem_1
 # Characteristic element size
-hs = [1 / 8, 1 / 16, 1 / 32]
+hs = [1 / 4, 1 / 8, 1 / 12, 1 / 16]
 # Polynomial order
-ks = [1, 2]
+ks = [1, 2, 3]
 # Permiability
 mu = 1.0
 
