@@ -4,8 +4,6 @@ from mpi4py import MPI
 from dolfinx.fem import assemble_scalar
 from ufl import (TrialFunction, TestFunction, inner, dx)
 from dolfinx.io import XDMFFile
-from dolfinx.cpp.io import extract_local_entities
-from dolfinx.cpp.graph import AdjacencyList_int32
 from dolfinx.mesh import create_meshtags
 
 
