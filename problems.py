@@ -19,7 +19,7 @@ class Problem():
              density)
         B_e: Exact solution for the B field (None if no exact
              solution)
-        """
+    """
     def __init__(self, mesh, k, mu, T_0, B_e):
         self.mesh = mesh
         self.k = k
