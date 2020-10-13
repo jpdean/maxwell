@@ -9,6 +9,8 @@
 from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
 from ufl import TrialFunction, TestFunction, inner, dx, curl
 from util import project
+from dolfinx.fem import assemble_matrix, assemble_vector
+from petsc4py import PETSc
 
 
 def solve_problem(problem):
@@ -35,10 +37,29 @@ def solve_problem(problem):
     # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
     # TODO Set up solver manually
     # TODO Use AMS
-    solve(a == L, A, [], petsc_options={"ksp_type": "cg",
-                                        "pc_type": "icc",
-                                        "ksp_rtol": 1e-12,
-                                        "ksp_monitor": None})
+
+    # TODO More steps needed here for Dirichlet boundaries
+    mat = assemble_matrix(a, [])
+    mat.assemble()
+    vec = assemble_vector(L)
+
+    # Set solver options
+    opts = PETSc.Options()
+    opts["ksp_type"] = "cg"
+    opts["pc_type"] = "icc"
+    opts["ksp_rtol"] = 1e-12
+    opts["ksp_monitor"] = None
+
+    # Create solver
+    solver = PETSc.KSP().create(problem.mesh.mpi_comm())
+    solver.setFromOptions()
+
+    # Set matrix operator
+    solver.setOperators(mat)
+
+    # Compute solution
+    solver.solve(vec, A.vector)
+    solver.view()
     return A
 
 
