@@ -18,7 +18,7 @@ results = pickle.load(open("convergence_results.p", "rb"))
 
 fig, ax = plt.subplots()
 for k, (hs, l2_errors) in results.items():
-    ax.loglog(hs, l2_errors, "-x", label=k)
+    ax.loglog(hs, l2_errors, "-x", label=f"k = {k}")
     r = compute_conv_rate(hs, l2_errors)
 
     print(f"k = {k}")
@@ -26,5 +26,6 @@ for k, (hs, l2_errors) in results.items():
     print()
 
 ax.legend()
-ax.set(xlabel='$h$', ylabel=r'$L^2(\Omega)$-norm of error')
+ax.set(xlabel='$h$', ylabel=r'$L^2(\Omega)$-norm of error in B')
+ax.invert_xaxis()
 plt.show()
