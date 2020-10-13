@@ -9,6 +9,8 @@ import pickle
 
 
 def compute_conv_rate(hs, l2_errors):
+    """Computes convergence rates from a list of characteristic
+    element sizes (hs) and a list of errors (l2_errors)"""
     r = np.log(l2_errors[-1] / l2_errors[-2]) / \
         np.log(hs[-1] / hs[-2])
     return r
