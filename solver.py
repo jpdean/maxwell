@@ -51,8 +51,7 @@ def compute_B(A, k, mesh):
     Returns:
         B: The magnetic flux density
     """
-    # TODO Get k from A somehow and use k - 1 in the function space definition,
-    # rather than having to do it manually
+    # TODO Get k from A somehow and use k - 1 for degree of V
     V = VectorFunctionSpace(mesh, ("DG", k))
     B = project(curl(A), V)
     return B
