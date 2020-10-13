@@ -1,5 +1,5 @@
 # Computes convergence results for problems in problems.py that
-# have analytical solutions. Results are picked to convergence_results.p
+# have analytical solutions. Results are pickled to convergence_results.p
 # and can be plotted using plot_convergence.py.
 
 import pickle
