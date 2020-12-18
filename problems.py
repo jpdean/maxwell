@@ -23,7 +23,7 @@ if __name__ == "__main__":
     # Space degree
     k = 1
     # Cell diameter
-    h = 1 / 8
+    h = 1 / 4
     # Permeability
     mu = 1
 
