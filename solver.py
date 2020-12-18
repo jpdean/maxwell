@@ -18,10 +18,10 @@ def solve_problem(problem):
     Args:
         problem: A problem created by problems.py
     Returns:
-        A: The magnetic vector potential. Note that A is not unique because 
-        of the nullspace of the curl operator i.e. curl(grad(\phi)) = 0 for 
-        any \phi, so for any A that is a solution, A + grad(\phi) is also a 
-        solution.
+        A: The magnetic vector potential. Note that A is not unique because
+           of the nullspace of the curl operator i.e. curl(grad(\phi)) = 0 for
+           any \phi, so for any A that is a solution, A + grad(\phi) is also a
+           solution.
     """
     V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
