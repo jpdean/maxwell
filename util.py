@@ -1,10 +1,9 @@
-from dolfinx import (Function, solve)
+from dolfinx import Function, solve
 import numpy as np
 from mpi4py import MPI
 from dolfinx.fem import assemble_scalar
 from ufl import (TrialFunction, TestFunction, inner, dx)
 from dolfinx.io import XDMFFile
-from dolfinx.mesh import create_meshtags
 
 
 def project(f, V):
@@ -17,6 +16,7 @@ def project(f, V):
     L = inner(f, v) * dx
 
     u = Function(V)
+    # FIXME Probably shouldn't use solve
     solve(a == L, u, [], petsc_options={"ksp_type": "cg"})
     return u
 

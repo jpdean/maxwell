@@ -5,8 +5,6 @@ from solver import solve_problem, compute_B
 from util import save_function, L2_norm
 
 
-# FIXME Get ufl to compute f and B from A for checking solution
-
 def create_problem_1(h, mu):
     n = round(1 / h)
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
@@ -14,7 +12,7 @@ def create_problem_1(h, mu):
     T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
                      - pi * cos(x[0] * pi) / mu,
                      - pi * cos(x[1] * pi) / mu))
-    # TODO Compute from T_0 with UFL
+    # FIXME Get ufl to compute f and B from A for checking solution
     B_e = as_vector((- pi * cos(x[2] * pi),
                      - pi * cos(x[0] * pi),
                      - pi * cos(x[1] * pi)))
