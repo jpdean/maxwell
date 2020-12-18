@@ -6,7 +6,7 @@
 # TODO Solver currently assumes homogeneous Neumann BCs everywhere. Add
 # ability to use more complicated BCs
 
-from dolfinx import Function,  FunctionSpace, solve, VectorFunctionSpace
+from dolfinx import Function,  FunctionSpace, VectorFunctionSpace
 from ufl import TrialFunction, TestFunction, inner, dx, curl
 from util import project
 from dolfinx.fem import assemble_matrix, assemble_vector
@@ -18,7 +18,7 @@ def solve_problem(problem):
     Args:
         problem: A problem created by problems.py
     Returns:
-        A: The magnetic vector potential
+        A: The magnetic vector potential (not unique)
     """
     V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
