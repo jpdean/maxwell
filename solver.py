@@ -13,7 +13,7 @@ from dolfinx.fem import assemble_matrix, assemble_vector
 from petsc4py import PETSc
 
 
-def solve_problem(problem):
+def solve_problem(mesh, k, mu, T_0):
     """Solves a magnetostatic problem.
     Args:
         problem: A problem created by problems.py
@@ -23,13 +23,11 @@ def solve_problem(problem):
            any \phi, so for any A that is a solution, A + grad(\phi) is also a
            solution.
     """
-    V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
+    V = FunctionSpace(mesh, ("N1curl", k))
 
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    mu = problem.mu
-    T_0 = problem.T_0
     a = inner(1 / mu * curl(A), curl(v)) * dx
 
     L = inner(T_0, curl(v)) * dx
@@ -51,7 +49,7 @@ def solve_problem(problem):
     opts["ksp_monitor"] = None
 
     # Create solver
-    solver = PETSc.KSP().create(problem.mesh.mpi_comm())
+    solver = PETSc.KSP().create(mesh.mpi_comm())
     solver.setFromOptions()
 
     # Set matrix operator
