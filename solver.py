@@ -18,7 +18,10 @@ def solve_problem(problem):
     Args:
         problem: A problem created by problems.py
     Returns:
-        A: The magnetic vector potential (not unique)
+        A: The magnetic vector potential. Note that A is not unique because 
+        of the nullspace of the curl operator i.e. curl(grad(\phi)) = 0 for 
+        any \phi, so for any A that is a solution, A + grad(\phi) is also a 
+        solution.
     """
     V = FunctionSpace(problem.mesh, ("N1curl", problem.k))
 
@@ -32,17 +35,14 @@ def solve_problem(problem):
     L = inner(T_0, curl(v)) * dx
 
     A = Function(V)
-    # NOTE That A is not unique because of the nullspace of the curl operator
-    # i.e. curl(grad(\phi)) = 0 for any \phi, so for any A that is a solution,
-    # A + grad(\phi) is also a solution. Hence, must use an iterative solver.
-    # TODO Set up solver manually
-    # TODO Use AMS
 
     # TODO More steps needed here for Dirichlet boundaries
     mat = assemble_matrix(a, [])
     mat.assemble()
     vec = assemble_vector(L)
 
+    # TODO Use AMS
+    # NOTE Need to use iterative solver due to nullspace of curl operator
     # Set solver options
     opts = PETSc.Options()
     opts["ksp_type"] = "cg"
