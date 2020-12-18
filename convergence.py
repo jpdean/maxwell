@@ -8,22 +8,22 @@ import problems
 from util import L2_norm
 
 # Problem
-prob_gen = problems.create_problem_1
+create_problem = problems.create_problem_1
 # Characteristic element size
 hs = [1 / 4, 1 / 8, 1 / 12, 1 / 16]
-# Polynomial order
-ks = [1, 2, 3]
-# Permiability
+# Polynomial orders
+ks = [1]
+# Permeability
 mu = 1.0
 
 results = {}
 for k in ks:
     l2_errors = []
     for h in hs:
-        problem = prob_gen(h, k, mu)
-        A = solve_problem(problem)
-        B = compute_B(A, k - 1, problem.mesh)
-        e = L2_norm(B - problem.B_e)
+        mesh, T_0, B_e = create_problem(h, mu)
+        A = solve_problem(mesh, k, mu, T_0)
+        B = compute_B(A, k - 1, mesh)
+        e = L2_norm(B - B_e)
         l2_errors.append(e)
     results[k] = (hs, l2_errors)
 
