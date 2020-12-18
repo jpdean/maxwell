@@ -61,12 +61,54 @@ def solve_problem(mesh, k, mu, T_0):
     # Attach discrete gradient to preconditioner
     pc.setHYPREDiscreteGradient(G)
 
+    # def dir_0_expr(x):
+    #     values = np.empty((3, x.shape[1]))
+    #     values[0] = 1
+    #     values[1] = 0
+    #     values[2] = 0
+    #     return values
+
+    # def dir_1_expr(x):
+    #     values = np.empty((3, x.shape[1]))
+    #     values[0] = 0
+    #     values[1] = 1
+    #     values[2] = 0
+    #     return values
+
+    # def dir_2_expr(x):
+    #     values = np.empty((3, x.shape[1]))
+    #     values[0] = 0
+    #     values[1] = 0
+    #     values[2] = 1
+    #     return values
+
+    # vec_P1 = VectorFunctionSpace(mesh, ("Lagrange", 1))
+    # dir_0_func = Function(vec_P1)
+    # dir_1_func = Function(vec_P1)
+    # dir_2_func = Function(vec_P1)
+
+    # dir_0_func.interpolate(dir_0_expr)
+    # dir_1_func.interpolate(dir_1_expr)
+    # dir_2_func.interpolate(dir_2_expr)
+
+    # dir_0 = project(dir_0_func, V)
+    # dir_1 = project(dir_1_func, V)
+    # dir_2 = project(dir_2_func, V)
+
+    # pc.setHYPRESetEdgeConstantVectors(dir_0.vector, dir_1.vector, dir_2.vector)
+
+    # Build constants basis for the Nedelec space
+    # dir_0 = project(as_vector((1, 0, 0)), V).vector
+    # dir_1 = project(as_vector((0, 1, 0)), V).vector
+    # dir_2 = project(as_vector((0, 0, 1)), V).vector
+    # pc.setHYPRESetEdgeConstantVectors(dir_0, dir_1, dir_2)
+
+    # FIXME Why doesn't the below work?
     cvecs = []
     for i in range(3):
         direction = as_vector([1.0 if i == j else 0.0 for j in range(3)])
-        cvecs.append(project(direction, V).vector)
-
-    pc.setHYPRESetEdgeConstantVectors(cvecs[0], cvecs[1], cvecs[2])
+        cvecs.append(project(direction, V))
+    pc.setHYPRESetEdgeConstantVectors(cvecs[0].vector, cvecs[1].vector, cvecs[2].vector)
 
     # We are dealing with a zero conductivity problem (no mass term), so
     # we need to tell the preconditioner
