@@ -6,15 +6,8 @@ from util import save_function, L2_norm
 
 
 # FIXME Get ufl to compute f and B from A for checking solution
-# TODO Make problem factory
-if __name__ == "__main__":
-    # Space degree
-    k = 1
-    # Number of elements in each direction
-    n = 4
-    # Permeability
-    mu = 1
 
+def create_problem_1(n, mu):
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
     T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
@@ -24,6 +17,18 @@ if __name__ == "__main__":
     B_e = as_vector((- pi * cos(x[2] * pi),
                      - pi * cos(x[0] * pi),
                      - pi * cos(x[1] * pi)))
+    return mesh, T_0, B_e
+
+
+if __name__ == "__main__":
+    # Space degree
+    k = 1
+    # Number of elements in each direction
+    n = 4
+    # Permeability
+    mu = 1
+
+    mesh, T_0, B_e = create_problem_1(n, mu)
 
     A = solve_problem(mesh, k, mu, T_0)
     save_function(A, mesh, "A.xdmf")
