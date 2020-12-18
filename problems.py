@@ -49,7 +49,7 @@ def create_problem_1(h, k, mu):
 
 if __name__ == "__main__":
     k = 1
-    h = 1 / 32
+    h = 1 / 12
     mu = 1
     problem = create_problem_1(h, k, mu)
     A = solve_problem(problem)
