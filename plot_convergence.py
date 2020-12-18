@@ -1,4 +1,4 @@
-# Plots the relative error of the velocity in the L2-norm
+# Plots the error if the velocity in the L2-norm
 # against the element size for different values of k.
 # Also computes the order of convergence for each k. Note that
 # convergence.py must be run first to generate the results.
