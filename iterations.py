@@ -1,3 +1,7 @@
+# Records the number of iterations and time taken to solve problems of
+# increasing size. The results are saved to iteration_results.p and can
+# be plotted with plot_iterations.py.
+
 from problems import create_problem_1
 from solver import solve_problem
 import numpy as np

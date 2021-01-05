@@ -1,3 +1,5 @@
+# Plots the output from iterations.py.
+
 import plotly.graph_objects as go
 import pickle
 import numpy as np
