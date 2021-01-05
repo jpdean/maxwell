@@ -6,7 +6,7 @@ from util import save_function, L2_norm
 
 
 def create_problem_1(h, mu):
-    n = round(1 / h)
+    n = int(round(1 / h))
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
     T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
@@ -29,7 +29,8 @@ if __name__ == "__main__":
 
     mesh, T_0, B_e = create_problem_1(h, mu)
 
-    A = solve_problem(mesh, k, mu, T_0)
+    results = solve_problem(mesh, k, mu, T_0)
+    A = results["A"]
     save_function(A, mesh, "A.xdmf")
     B = compute_B(A, k - 1, mesh)
     save_function(B, mesh, "B.xdmf")

@@ -13,6 +13,7 @@ from dolfinx.fem import assemble_matrix, assemble_vector
 from petsc4py import PETSc
 from dolfinx.cpp.fem import build_discrete_gradient
 import numpy as np
+from dolfinx.common import Timer
 
 
 def solve_problem(mesh, k, mu, T_0):
@@ -80,9 +81,15 @@ def solve_problem(mesh, k, mu, T_0):
     ksp.setFromOptions()
 
     # Compute solution
+    t = Timer()
+    t.start()
     ksp.solve(vec, A.vector)
     ksp.view()
-    return A
+    t.stop()
+    return {"A": A,
+            "ndofs": A.vector.getSize(),
+            "solve_time": t.elapsed()[0],
+            "iterations": ksp.its}
 
 
 def compute_B(A, k, mesh):
