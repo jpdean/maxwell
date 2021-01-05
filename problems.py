@@ -6,7 +6,7 @@ from util import save_function, L2_norm
 
 
 def create_problem_1(h, mu):
-    n = round(1 / h)
+    n = int(round(1 / h))
     mesh = UnitCubeMesh(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
     T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
