@@ -1,7 +1,7 @@
-from dolfinx import Function, solve
+from dolfinx import Function
 import numpy as np
 from mpi4py import MPI
-from dolfinx.fem import assemble_scalar
+from dolfinx.fem import assemble_scalar, LinearProblem
 from ufl import (TrialFunction, TestFunction, inner, dx)
 from dolfinx.io import XDMFFile
 
@@ -15,10 +15,9 @@ def project(f, V):
     a = inner(u, v) * dx
     L = inner(f, v) * dx
 
-    u = Function(V)
-    # FIXME Probably shouldn't use solve
-    solve(a == L, u, [], petsc_options={"ksp_type": "cg"})
-    return u
+    problem = LinearProblem(a, L, petsc_options={"ksp_type": "cg"})
+    u_h = problem.solve()
+    return u_h
 
 
 def save_function(v, mesh, filename):
