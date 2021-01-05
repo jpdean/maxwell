@@ -29,7 +29,8 @@ if __name__ == "__main__":
 
     mesh, T_0, B_e = create_problem_1(h, mu)
 
-    A = solve_problem(mesh, k, mu, T_0)
+    results = solve_problem(mesh, k, mu, T_0)
+    A = results["A"]
     save_function(A, mesh, "A.xdmf")
     B = compute_B(A, k - 1, mesh)
     save_function(B, mesh, "B.xdmf")

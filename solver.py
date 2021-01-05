@@ -11,6 +11,7 @@ from ufl import TrialFunction, TestFunction, inner, dx, curl
 from util import project
 from dolfinx.fem import assemble_matrix, assemble_vector
 from petsc4py import PETSc
+from dolfinx.common import Timer
 
 
 def solve_problem(mesh, k, mu, T_0):
@@ -56,9 +57,15 @@ def solve_problem(mesh, k, mu, T_0):
     solver.setOperators(mat)
 
     # Compute solution
+    t = Timer()
+    t.start()
     solver.solve(vec, A.vector)
     solver.view()
-    return A
+    t.stop()
+    return {"A": A,
+            "ndofs": A.vector.getSize(),
+            "solve_time": t.elapsed()[0],
+            "iterations": solver.its}
 
 
 def compute_B(A, k, mesh):
