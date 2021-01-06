@@ -36,16 +36,17 @@ def solve_problem(mesh, k, mu, T_0):
     A = Function(V)
 
     # TODO More steps needed here for Dirichlet boundaries
-    mat = assemble_matrix(a, [])
+    mat = assemble_matrix(a)
     mat.assemble()
     vec = assemble_vector(L)
+    vec.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     # TODO Use AMS
     # NOTE Need to use iterative solver due to nullspace of curl operator
     # Set solver options
     opts = PETSc.Options()
     opts["ksp_type"] = "cg"
-    opts["pc_type"] = "icc"
+    opts["pc_type"] = "gamg"
     opts["ksp_rtol"] = 1e-12
     opts["ksp_monitor"] = None
 
@@ -60,6 +61,8 @@ def solve_problem(mesh, k, mu, T_0):
     t = Timer()
     t.start()
     solver.solve(vec, A.vector)
+    A.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT,
+                         mode=PETSc.ScatterMode.FORWARD)
     solver.view()
     t.stop()
     return {"A": A,
