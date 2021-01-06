@@ -57,6 +57,7 @@ def solve_problem(mesh, k, mu, T_0):
     pc.setHYPREType("ams")
 
     # Build discrete gradient
+    # FIXME This seems to be the bottleneck at the moment
     G = build_discrete_gradient(V._cpp_object,
                                 FunctionSpace(mesh, ("CG", 1))._cpp_object)
 
@@ -79,6 +80,9 @@ def solve_problem(mesh, k, mu, T_0):
     ksp.setOperators(mat)
 
     ksp.setMonitor(lambda ksp, its, rnorm: print("Iteration: {}, rel. residual: {}".format(its, rnorm)))
+
+    # opts = PETSc.Options()
+    # opts["pc_hypre_ams_cycle_type"] = 13
     ksp.setFromOptions()
 
     # Compute solution
