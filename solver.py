@@ -38,9 +38,10 @@ def solve_problem(mesh, k, mu, T_0):
     A = Function(V)
 
     # TODO More steps needed here for Dirichlet boundaries
-    mat = assemble_matrix(a, [])
+    mat = assemble_matrix(a)
     mat.assemble()
     vec = assemble_vector(L)
+    vec.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     # Create solver
     ksp = PETSc.KSP().create(mesh.mpi_comm())
@@ -84,6 +85,8 @@ def solve_problem(mesh, k, mu, T_0):
     t = Timer()
     t.start()
     ksp.solve(vec, A.vector)
+    A.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT,
+                         mode=PETSc.ScatterMode.FORWARD)
     ksp.view()
     t.stop()
     return {"A": A,
