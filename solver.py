@@ -16,15 +16,18 @@ import numpy as np
 from dolfinx.common import Timer
 
 
-def solve_problem(mesh, k, mu, T_0):
+def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
     """Solves a magnetostatic problem.
     Args:
-        problem: A problem created by problems.py
+        mesh: the mesh
+        k: order of space
+        T_0: impressed magnetic field
+        preconditioner: "ams" or "gamg"
     Returns:
-        A: The magnetic vector potential. Note that A is not unique because
-           of the nullspace of the curl operator i.e. curl(grad(\phi)) = 0 for
-           any \phi, so for any A that is a solution, A + grad(\phi) is also a
-           solution.
+        A: Magnetic vector potential
+        ndofs: number of degrees of freedom
+        solve_time: time taked for solver alone
+        iterations: number of solver iterations
     """
     V = FunctionSpace(mesh, ("N1curl", k))
 
@@ -50,39 +53,43 @@ def solve_problem(mesh, k, mu, T_0):
     ksp.setType("cg")
     ksp.setTolerances(rtol=1.0e-8, atol=1.0e-12, divtol=1.0e10, max_it=300)
 
-    # Get the preconditioner and set type
-    # Based on: https://bitbucket.org/fenics-project/dolfin/src/master/python/demo/undocumented/curl-curl/demo_curl-curl.py
     pc = ksp.getPC()
-    pc.setType("hypre")
-    pc.setHYPREType("ams")
+    if preconditioner == "ams":
+        # Based on: https://bitbucket.org/fenics-project/dolfin/src/master/python/demo/undocumented/curl-curl/demo_curl-curl.py
+        pc.setType("hypre")
+        pc.setHYPREType("ams")
 
-    # Build discrete gradient
-    # FIXME This seems to be the bottleneck at the moment
-    G = build_discrete_gradient(V._cpp_object,
-                                FunctionSpace(mesh, ("CG", 1))._cpp_object)
+        # Build discrete gradient
+        G = build_discrete_gradient(V._cpp_object,
+                                    FunctionSpace(mesh, ("CG", 1))._cpp_object)
 
-    # Attach discrete gradient to preconditioner
-    pc.setHYPREDiscreteGradient(G)
+        # Attach discrete gradient to preconditioner
+        pc.setHYPREDiscreteGradient(G)
 
-    cvecs = []
-    for i in range(3):
-        direction = as_vector([1.0 if i == j else 0.0 for j in range(3)])
-        cvecs.append(project(direction, V))
-    pc.setHYPRESetEdgeConstantVectors(cvecs[0].vector,
-                                      cvecs[1].vector,
-                                      cvecs[2].vector)
+        cvecs = []
+        for i in range(3):
+            direction = as_vector([1.0 if i == j else 0.0 for j in range(3)])
+            cvecs.append(project(direction, V))
+        pc.setHYPRESetEdgeConstantVectors(cvecs[0].vector,
+                                          cvecs[1].vector,
+                                          cvecs[2].vector)
 
-    # We are dealing with a zero conductivity problem (no mass term), so
-    # we need to tell the preconditioner
-    pc.setHYPRESetBetaPoissonMatrix(None)
+        # We are dealing with a zero conductivity problem (no mass term), so
+        # we need to tell the preconditioner
+        pc.setHYPRESetBetaPoissonMatrix(None)
+
+        # Can set more amg options like:
+        # opts = PETSc.Options()
+        # opts["pc_hypre_ams_cycle_type"] = 13
+    elif preconditioner == "gamg":
+        pc.setType("gamg")
 
     # Set matrix operator
     ksp.setOperators(mat)
 
-    ksp.setMonitor(lambda ksp, its, rnorm: print("Iteration: {}, rel. residual: {}".format(its, rnorm)))
+    ksp.setMonitor(lambda ksp, its, rnorm: print(
+        "Iteration: {}, rel. residual: {}".format(its, rnorm)))
 
-    # opts = PETSc.Options()
-    # opts["pc_hypre_ams_cycle_type"] = 13
     ksp.setFromOptions()
 
     # Compute solution
