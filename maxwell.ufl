@@ -1,0 +1,29 @@
+
+coord_element = VectorElement("Lagrange", tetrahedron, 1)
+mesh = Mesh(coord_element)
+
+Hcurl_element = FiniteElement("N1curl", tetrahedron, 1)
+Q = FunctionSpace(mesh, Hcurl_element)
+
+mu = 1.0
+# T_0 = Coefficient(element)
+
+x = SpatialCoordinate(mesh)
+T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
+                 - pi * cos(x[0] * pi) / mu,
+                 - pi * cos(x[1] * pi) / mu))
+
+A = TrialFunction(Q)
+v = TestFunction(Q)
+
+Kc = inner(1 / mu * curl(A), curl(v)) * dx
+Mc = inner(A, v)*dx
+L = inner(T_0, curl(v)) * dx
+
+Hgrad_element = FiniteElement("Lagrange", tetrahedron, 1)
+V = FunctionSpace(mesh, Hgrad_element)
+u = TrialFunction(V)
+v = TestFunction(V)
+Mg = inner(u, v) * dx
+
+forms = [Kc, Mc, Mg, L]
