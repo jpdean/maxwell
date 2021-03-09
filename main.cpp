@@ -1,17 +1,19 @@
 
 #include "maxwell.h"
+#include <MatrixMarket_Tpetra.hpp>
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 #include <dolfinx.h>
 
 Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>
-create_tpetra_matrix(MPI_Comm mpi_comm, const fem::Form<PetscScalar> &a) {
+create_tpetra_matrix(MPI_Comm mpi_comm,
+                     const dolfinx::la::SparsityPattern &pattern) {
   Teuchos::RCP<const Teuchos::Comm<int>> comm =
       Teuchos::rcp(new Teuchos::MpiComm<int>(mpi_comm));
 
-  dolfinx::la::SparsityPattern pattern =
-      dolfinx::fem::create_sparsity_pattern(a);
-  pattern.assemble();
+  std::cout << "Sparsity = " << pattern.index_map(0)->size_global() << "x"
+            << pattern.index_map(1)->size_global() << "\n";
+
   const dolfinx::graph::AdjacencyList<std::int32_t> &diagonal_pattern =
       pattern.diagonal_pattern();
   const dolfinx::graph::AdjacencyList<std::int32_t> &off_diagonal_pattern =
@@ -22,27 +24,35 @@ create_tpetra_matrix(MPI_Comm mpi_comm, const fem::Form<PetscScalar> &a) {
     nnz[i] = diagonal_pattern.num_links(i) + off_diagonal_pattern.num_links(i);
 
   dolfinx::common::Timer tcre("Trilinos: create sparsity");
-  std::vector<std::int64_t> global_indices = pattern.column_indices();
+  std::vector<std::int64_t> global_indices1 = pattern.column_indices();
 
-  const std::shared_ptr<const fem::FunctionSpace> V = a.function_spaces()[0];
-  const Teuchos::ArrayView<const std::int64_t> global_index_view(
-      global_indices.data(), global_indices.size());
+  const Teuchos::ArrayView<const std::int64_t> global_index_view1(
+      global_indices1.data(), global_indices1.size());
   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t>> colMap =
       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t>(
-          V->dofmap()->index_map->size_global(), global_index_view, 0, comm));
+          pattern.index_map(1)->size_global(), global_index_view1, 0, comm));
 
-  const Teuchos::ArrayView<const std::int64_t> global_index_vec_view(
-      global_indices.data(), V->dofmap()->index_map->size_local());
+  // Column map with no ghosts = domain map (needed for rectangular matrix)
+  const Teuchos::ArrayView<const std::int64_t> global_index_view1_domain(
+      global_indices1.data(), pattern.index_map(1)->size_local());
+  Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t>> domainMap =
+      Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t>(
+          pattern.index_map(1)->size_global(), global_index_view1_domain, 0,
+          comm));
+
+  std::vector<std::int64_t> global_indices0 =
+      pattern.index_map(0)->global_indices();
+  const Teuchos::ArrayView<const std::int64_t> global_index_view0(
+      global_indices0.data(), pattern.index_map(0)->size_local());
   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t>> vecMap =
       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t>(
-          V->dofmap()->index_map->size_global(), global_index_vec_view, 0,
-          comm));
+          pattern.index_map(0)->size_global(), global_index_view0, 0, comm));
 
   Teuchos::ArrayView<std::size_t> _nnz(nnz.data(), nnz.size());
   Teuchos::RCP<Tpetra::CrsGraph<std::int32_t, std::int64_t>> crs_graph(
       new Tpetra::CrsGraph<std::int32_t, std::int64_t>(vecMap, colMap, _nnz));
 
-  const std::int64_t nlocalrows = V->dofmap()->index_map->size_local();
+  const std::int64_t nlocalrows = pattern.index_map(0)->size_local();
   for (std::size_t i = 0; i != diagonal_pattern.num_nodes(); ++i) {
     std::vector<std::int32_t> indices(diagonal_pattern.links(i).begin(),
                                       diagonal_pattern.links(i).end());
@@ -53,7 +63,7 @@ create_tpetra_matrix(MPI_Comm mpi_comm, const fem::Form<PetscScalar> &a) {
     crs_graph->insertLocalIndices(i, _indices);
   }
 
-  crs_graph->fillComplete();
+  crs_graph->fillComplete(domainMap, vecMap);
   tcre.stop();
 
   Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>
@@ -63,30 +73,128 @@ create_tpetra_matrix(MPI_Comm mpi_comm, const fem::Form<PetscScalar> &a) {
   return A_Tpetra;
 }
 
+Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>
+create_tpetra_diagonal_matrix(
+    std::shared_ptr<const common::IndexMap> index_map) {
+
+  Teuchos::RCP<const Teuchos::Comm<int>> comm =
+      Teuchos::rcp(new Teuchos::MpiComm<int>(index_map->comm()));
+
+  // Get non-ghost global indices only
+  std::vector<std::int64_t> global_indices = index_map->global_indices();
+  global_indices.resize(index_map->size_local());
+
+  Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t>> vecMap =
+      Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t>(
+          index_map->size_global(), global_indices, 0, comm));
+
+  Teuchos::RCP<Tpetra::CrsGraph<std::int32_t, std::int64_t>> crs_graph(
+      new Tpetra::CrsGraph<std::int32_t, std::int64_t>(vecMap, vecMap, 1));
+
+  for (std::size_t i = 0; i != index_map->size_local(); ++i) {
+    std::vector<std::int32_t> indices(1, i);
+    crs_graph->insertLocalIndices(i, indices);
+  }
+
+  crs_graph->fillComplete();
+
+  Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>
+      A_Tpetra = Teuchos::rcp(
+          new Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>(
+              crs_graph));
+  return A_Tpetra;
+}
+
+void tpetra_assemble(
+    Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>
+        A_Tpetra,
+    const fem::Form<PetscScalar> &form) {
+
+  std::vector<std::int64_t> global_cols; // temp for columns
+  const std::shared_ptr<const fem::FunctionSpace> V = form.function_spaces()[0];
+  const std::int64_t nlocalrows = V->dofmap()->index_map->size_local();
+  std::vector<std::int64_t> global_indices =
+      V->dofmap()->index_map->global_indices();
+
+  std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
+                    const std::int32_t *, const PetscScalar *)>
+      tpetra_insert = [&A_Tpetra, &global_indices, &global_cols, &nlocalrows](
+                          std::int32_t nr, const std::int32_t *rows,
+                          const std::int32_t nc, const std::int32_t *cols,
+                          const PetscScalar *data) {
+        for (std::int32_t i = 0; i < nr; ++i) {
+          Teuchos::ArrayView<const double> data_view(data + i * nc, nc);
+          if (rows[i] < nlocalrows) {
+            Teuchos::ArrayView<const int> col_view(cols, nc);
+            int nvalid =
+                A_Tpetra->sumIntoLocalValues(rows[i], col_view, data_view);
+            if (nvalid != nc)
+              throw std::runtime_error("Inserted " + std::to_string(nvalid) +
+                                       "/" + std::to_string(nc) + " on row:" +
+                                       std::to_string(global_indices[rows[i]]));
+          } else {
+            global_cols.resize(nc);
+            for (int j = 0; j < nc; ++j)
+              global_cols[j] = global_indices[cols[j]];
+            int nvalid = A_Tpetra->sumIntoGlobalValues(global_indices[rows[i]],
+                                                       global_cols, data_view);
+            if (nvalid != nc)
+              throw std::runtime_error("Inserted " + std::to_string(nvalid) +
+                                       "/" + std::to_string(nc) + " on row:" +
+                                       std::to_string(global_indices[rows[i]]));
+          }
+        }
+        return 0;
+      };
+
+  fem::assemble_matrix(tpetra_insert, form, {});
+}
+
 int main(int argc, char **argv) {
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
-  std::size_t n = 12;
+  std::size_t n = 3;
   auto cmap = fem::create_coordinate_map(create_coordinate_map_maxwell);
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
           MPI_COMM_WORLD, {{{0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}}}, {n, n, n}, cmap,
           mesh::GhostMode::none));
 
+  // N1curl space for Kc and Mc
   auto V = fem::create_functionspace(create_functionspace_form_maxwell_Mc, "A",
                                      mesh);
 
+  // Lagrange space for Mg
   auto Q = fem::create_functionspace(create_functionspace_form_maxwell_Mg, "u",
                                      mesh);
 
+  // Hcurl stiffness matrix
+  auto Kc =
+      fem::create_form<PetscScalar>(create_form_maxwell_Kc, {V, V}, {}, {}, {});
+  dolfinx::la::SparsityPattern Kc_pattern =
+      dolfinx::fem::create_sparsity_pattern(*Kc);
+  Kc_pattern.assemble();
+  auto Kc_mat = create_tpetra_matrix(mesh->mpi_comm(), Kc_pattern);
+  tpetra_assemble(Kc_mat, *Kc);
+  Kc_mat->fillComplete();
+
+  // Hcurl mass matrix
+  auto Mc =
+      fem::create_form<PetscScalar>(create_form_maxwell_Mc, {V, V}, {}, {}, {});
+  dolfinx::la::SparsityPattern Mc_pattern =
+      dolfinx::fem::create_sparsity_pattern(*Mc);
+  Mc_pattern.assemble();
+  auto Mc_mat = create_tpetra_matrix(mesh->mpi_comm(), Mc_pattern);
+  tpetra_assemble(Mc_mat, *Mc);
+  Mc_mat->fillComplete();
+
+  // Inverse lumped Hgrad mass matrix
   auto Mg =
       fem::create_form<PetscScalar>(create_form_maxwell_Mg, {Q, Q}, {}, {}, {});
-
-  auto Mg_mat = create_tpetra_matrix(mesh->mpi_comm(), *Mg);
-
-  // Lump mass matrix of Mg into diagonal vector
-  la::Vector<PetscScalar> Mg_vec(Q->dofmap()->index_map, 1);
+  std::shared_ptr<const common::IndexMap> qmap = Q->dofmap()->index_map;
+  // Lump mass matrix into diagonal vector
+  la::Vector<PetscScalar> Mg_vec(qmap, 1);
   std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
                     const std::int32_t *, const PetscScalar *)>
       lumper = [&Mg_vec](int nr, const int *rows, int nc, const int *cols,
@@ -101,7 +209,60 @@ int main(int argc, char **argv) {
       };
 
   fem::assemble_matrix(lumper, *Mg, {});
-  // TODO: 'export' values to other processes
+  // Gather and add ghost entries
+  la::scatter_rev(Mg_vec, common::IndexMap::Mode::add);
+
+  // Invert local values and insert into the diagonal of a matrix
+  std::vector<PetscScalar> &x = Mg_vec.mutable_array();
+  auto Mg_mat = create_tpetra_diagonal_matrix(qmap);
+  std::vector<std::int32_t> col(1);
+  std::vector<PetscScalar> val(1);
+  for (int i = 0; i < qmap->size_local(); ++i) {
+    col[0] = i;
+    val[0] = 1.0 / x[i];
+    Mg_mat->replaceLocalValues(i, col, val);
+  }
+  Mg_mat->fillComplete();
+
+  // Discrete gradient matrix
+  la::SparsityPattern D0_sp = fem::create_sparsity_discrete_gradient(*V, *Q);
+  auto D0_mat = create_tpetra_matrix(mesh->mpi_comm(), D0_sp);
+
+  // TODO - allocate D0_mat
+  std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
+                    const std::int32_t *, const PetscScalar *)>
+      mat_set_dg = [&D0_mat](int nr, const int *rows, int nc, const int *cols,
+                             const PetscScalar *data) {
+        for (int i = 0; i < nr; ++i) {
+          Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
+          Teuchos::ArrayView<const int> col_view(cols, nc);
+          D0_mat->replaceLocalValues(rows[i], col_view, data_view);
+        }
+        return 0;
+      };
+
+  fem::assemble_discrete_gradient(mat_set_dg, *V, *Q);
+  D0_mat->fillComplete();
+
+  std::cout << D0_mat->getGlobalNumRows() << "x" << D0_mat->getGlobalNumCols()
+            << "\n";
+
+  Tpetra::MatrixMarket::Writer<
+      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
+      writeSparseFile("D0.mat", *D0_mat, "D0", "Edge-based discrete gradient");
+
+  Tpetra::MatrixMarket::Writer<
+      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
+      writeSparseFile("Mg.mat", *Mg_mat, "Mg",
+                      "Lumped inverse Hgrad mass matrix");
+
+  Tpetra::MatrixMarket::Writer<
+      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
+      writeSparseFile("Mc.mat", *Mc_mat, "Mc", "Hcurl mass matrix");
+
+  Tpetra::MatrixMarket::Writer<
+      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
+      writeSparseFile("Kc.mat", *Kc_mat, "Kc", "Hcurl stiffness matrix");
 
   return 0;
 }
