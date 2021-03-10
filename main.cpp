@@ -291,8 +291,18 @@ int main(int argc, char **argv) {
   // MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
   //    Kc_mat, D0_mat, Mg_mat, Mc_mat, Teuchos::null, coords, MLList);
 
+  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
+      Kc_mat_X = Teuchos::rcp(
+          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
+              Kc_mat));
+
+  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Kc =
+      Teuchos::rcp(
+          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
+              Kc_mat_X));
+
   MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
-      Teuchos::null, Teuchos::null, Teuchos::null, Teuchos::null, Teuchos::null,
+      A_Kc, Teuchos::null, Teuchos::null, Teuchos::null, Teuchos::null,
       Teuchos::null, MLList);
 
   return 0;
