@@ -1,6 +1,8 @@
 
 #include "maxwell.h"
 #include <MatrixMarket_Tpetra.hpp>
+#include <MueLu_CreateTpetraPreconditioner.hpp>
+#include <MueLu_RefMaxwell.hpp>
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 #include <dolfinx.h>
@@ -244,9 +246,6 @@ int main(int argc, char **argv) {
   fem::assemble_discrete_gradient(mat_set_dg, *V, *Q);
   D0_mat->fillComplete();
 
-  std::cout << D0_mat->getGlobalNumRows() << "x" << D0_mat->getGlobalNumCols()
-            << "\n";
-
   Tpetra::MatrixMarket::Writer<
       Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
       writeSparseFile("D0.mat", *D0_mat, "D0", "Edge-based discrete gradient");
@@ -263,6 +262,31 @@ int main(int argc, char **argv) {
   Tpetra::MatrixMarket::Writer<
       Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t>>::
       writeSparseFile("Kc.mat", *Kc_mat, "Kc", "Hcurl stiffness matrix");
+
+  // Get nodal coordinates
+  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t>> coords =
+      Teuchos::rcp(new Tpetra::MultiVector<double, std::int32_t, std::int64_t>(
+          Mg_mat->getRowMap(), 3));
+  fem::Function<double> xcoord(Q);
+  for (int j = 0; j < 3; ++j) {
+    xcoord.interpolate([&j](auto &x) {
+      return std::vector<PetscScalar>(x.row(j).begin(), x.row(j).end());
+    });
+    for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
+      coords->replaceLocalValue(i, j, xcoord.x()->array()[i]);
+  }
+
+  Teuchos::ParameterList MLList;
+
+  // construct preconditioner
+  // Teuchos::RCP<
+  //     MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Kokkos::Serial>>
+  //     preconditioner =
+  //         Teuchos::rcp(new MueLu::RefMaxwell<double, std::int32_t,
+  //         std::int64_t,
+  //                                            Kokkos::Serial>(
+  //             Kc_mat, D0_mat, Mc_mat, Mg_mat, Mc_mat, Teuchos::null, coords,
+  //             MLList));
 
   return 0;
 }
