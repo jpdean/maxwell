@@ -129,7 +129,7 @@ void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
                           const std::int32_t nc, const std::int32_t *cols,
                           const PetscScalar *data) {
         for (std::int32_t i = 0; i < nr; ++i) {
-          Teuchos::ArrayView<const double> data_view(data + i * nc, nc);
+          Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
           if (rows[i] < nlocalrows) {
             Teuchos::ArrayView<const int> col_view(cols, nc);
             int nvalid =
@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
-  std::size_t n = 3;
+  std::size_t n = 12;
   auto cmap = fem::create_coordinate_map(create_coordinate_map_maxwell);
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
@@ -219,7 +219,7 @@ int main(int argc, char **argv) {
   la::scatter_rev(Mg_vec, common::IndexMap::Mode::add);
 
   // Invert local values and insert into the diagonal of a matrix
-  std::vector<PetscScalar> &x = Mg_vec.mutable_array();
+  const std::vector<PetscScalar> &x = Mg_vec.array();
   auto Mg_mat = create_tpetra_diagonal_matrix(qmap);
   std::vector<std::int32_t> col(1);
   std::vector<PetscScalar> val(1);
@@ -291,48 +291,50 @@ int main(int argc, char **argv) {
   // MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
   //    Kc_mat, D0_mat, Mg_mat, Mc_mat, Teuchos::null, coords, MLList);
 
-  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
-      Kc_mat_X = Teuchos::rcp(
-          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat));
-  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Kc =
-      Teuchos::rcp(
-          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat_X));
+  // Ridiculous casting/copying to Xpetra objects... can this be fixed?
 
-  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
-      Mc_mat_X = Teuchos::rcp(
-          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
-              Mc_mat));
-  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Mc =
-      Teuchos::rcp(
-          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
-              Mc_mat_X));
+  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      Kc_mat_X =
+          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
+                                                   std::int64_t, Node>(Kc_mat));
+  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      A_Kc =
+          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(Kc_mat_X));
 
-  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
-      Mg_mat_X = Teuchos::rcp(
-          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
-              Mg_mat));
-  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Mg =
-      Teuchos::rcp(
-          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
-              Mg_mat_X));
+  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      Mc_mat_X =
+          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
+                                                   std::int64_t, Node>(Mc_mat));
+  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      A_Mc =
+          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(Mc_mat_X));
 
-  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
-      D0_mat_X = Teuchos::rcp(
-          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
-              D0_mat));
-  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_D0 =
-      Teuchos::rcp(
-          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
-              D0_mat_X));
+  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      Mg_mat_X =
+          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
+                                                   std::int64_t, Node>(Mg_mat));
+  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      A_Mg =
+          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(Mg_mat_X));
+
+  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      D0_mat_X =
+          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
+                                                   std::int64_t, Node>(D0_mat));
+  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+      A_D0 =
+          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(D0_mat_X));
 
   Teuchos::RCP<Xpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       A_coords = Teuchos::rcp(
           new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t,
                                         Node>(coords));
 
-  MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
+  MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node> r(
       A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList);
 
   return 0;
