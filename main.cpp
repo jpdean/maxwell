@@ -295,15 +295,45 @@ int main(int argc, char **argv) {
       Kc_mat_X = Teuchos::rcp(
           new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
               Kc_mat));
-
   Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Kc =
       Teuchos::rcp(
           new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
               Kc_mat_X));
 
+  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
+      Mc_mat_X = Teuchos::rcp(
+          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
+              Mc_mat));
+  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Mc =
+      Teuchos::rcp(
+          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
+              Mc_mat_X));
+
+  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
+      Mg_mat_X = Teuchos::rcp(
+          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
+              Mg_mat));
+  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_Mg =
+      Teuchos::rcp(
+          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
+              Mg_mat_X));
+
+  Teuchos::RCP<Xpetra::CrsMatrix<double, std::int32_t, std::int64_t, Node>>
+      D0_mat_X = Teuchos::rcp(
+          new Xpetra::TpetraCrsMatrix<double, std::int32_t, std::int64_t, Node>(
+              D0_mat));
+  Teuchos::RCP<Xpetra::Matrix<double, std::int32_t, std::int64_t, Node>> A_D0 =
+      Teuchos::rcp(
+          new Xpetra::CrsMatrixWrap<double, std::int32_t, std::int64_t, Node>(
+              D0_mat_X));
+
+  Teuchos::RCP<Xpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+      A_coords = Teuchos::rcp(
+          new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t,
+                                        Node>(coords));
+
   MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
-      A_Kc, Teuchos::null, Teuchos::null, Teuchos::null, Teuchos::null,
-      Teuchos::null, MLList);
+      A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList);
 
   return 0;
 }
