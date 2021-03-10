@@ -276,6 +276,11 @@ int main(int argc, char **argv) {
       coords->replaceLocalValue(i, j, xcoord.x()->array()[i]);
   }
 
+  Tpetra::MatrixMarket::Writer<Tpetra::MultiVector<
+      double, std::int32_t, std::int64_t>>::writeDenseFile("coords.mat",
+                                                           *coords, "coords",
+                                                           "Nodal coordinates");
+
   Teuchos::ParameterList MLList;
 
   // construct preconditioner
