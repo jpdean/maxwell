@@ -234,13 +234,13 @@ int main(int argc, char **argv) {
   la::scatter_rev(Mg_vec, common::IndexMap::Mode::add);
 
   // Invert local values and insert into the diagonal of a matrix
-  const std::vector<PetscScalar> &x = Mg_vec.array();
+  const std::vector<PetscScalar> &vals = Mg_vec.array();
   auto Mg_mat = create_tpetra_diagonal_matrix(qmap);
   std::vector<std::int32_t> col(1);
   std::vector<PetscScalar> val(1);
   for (int i = 0; i < qmap->size_local(); ++i) {
     col[0] = i;
-    val[0] = 1.0 / x[i];
+    val[0] = 1.0 / vals[i];
     Mg_mat->replaceLocalValues(i, col, val);
   }
   Mg_mat->fillComplete();
@@ -300,11 +300,10 @@ int main(int argc, char **argv) {
       Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>::
       writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
 
+  // TODO: set parameters
   Teuchos::ParameterList MLList;
 
   // construct preconditioner
-  // MueLu::RefMaxwell<double, std::int32_t, std::int64_t, Node> r(
-  //    Kc_mat, D0_mat, Mg_mat, Mc_mat, Teuchos::null, coords, MLList);
 
   // Ridiculous casting/copying to Xpetra objects... can this be fixed?
 
@@ -354,8 +353,8 @@ int main(int argc, char **argv) {
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
               A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList));
 
-  using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
   // Create linear problem solver
+  using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
   Teuchos::RCP<Belos::OperatorT<MV>> belosOp = Teuchos::rcp(
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           A_Kc)); // Turns a Xpetra::Matrix object into a Belos operator
@@ -369,6 +368,29 @@ int main(int argc, char **argv) {
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           refMaxwell));
   problem->setRightPrec(belosPrecOp);
+
+  // Solution and RHS vectors
+  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+      x_tp = Teuchos::rcp(
+          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
+              Kc_mat->getRowMap(), 3));
+  Teuchos::RCP<MV> x = Teuchos::rcp(
+      new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
+          x_tp));
+
+  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+      b_tp = Teuchos::rcp(
+          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
+              Kc_mat->getRowMap(), 3));
+  Teuchos::RCP<MV> b = Teuchos::rcp(
+      new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
+          b_tp));
+
+  // TODO: fill RHS
+
+  problem->setProblem(x, b);
+
+  // TODO: call solver
 
   return 0;
 }
