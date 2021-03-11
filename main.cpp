@@ -7,6 +7,21 @@
 #include <Tpetra_CrsMatrix.hpp>
 #include <dolfinx.h>
 
+#include <Xpetra_CrsMatrix.hpp>
+#include <Xpetra_CrsMatrixFactory.hpp>
+#include <Xpetra_IO.hpp>
+#include <Xpetra_Map.hpp>
+#include <Xpetra_MapFactory.hpp>
+#include <Xpetra_MultiVector.hpp>
+#include <Xpetra_MultiVectorFactory.hpp>
+#include <Xpetra_Parameters.hpp>
+#include <Xpetra_Vector.hpp>
+
+#include <BelosConfigDefs.hpp>
+#include <BelosLinearProblem.hpp>
+#include <BelosSolverFactory.hpp>
+#include <BelosXpetraAdapter.hpp>
+
 using Node = Kokkos::Compat::KokkosSerialWrapperNode;
 
 Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
@@ -334,8 +349,26 @@ int main(int argc, char **argv) {
           new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t,
                                         Node>(coords));
 
-  MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node> r(
-      A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList);
+  Teuchos::RCP<MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>>
+      refMaxwell = rcp(
+          new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
+              A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList));
+
+  using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
+  // Create linear problem solver
+  Teuchos::RCP<Belos::OperatorT<MV>> belosOp = Teuchos::rcp(
+      new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
+          A_Kc)); // Turns a Xpetra::Matrix object into a Belos operator
+
+  Teuchos::RCP<Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>>
+      problem = rcp(
+          new Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>());
+  problem->setOperator(belosOp);
+
+  Teuchos::RCP<Belos::OperatorT<MV>> belosPrecOp = Teuchos::rcp(
+      new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
+          refMaxwell));
+  problem->setRightPrec(belosPrecOp);
 
   return 0;
 }
