@@ -387,16 +387,28 @@ int main(int argc, char **argv) {
           b_tp));
 
 
-    // Hcurl RHS vector
-  auto Lform =
-      fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
-    fem::assemble_vector(tcb::span<PetscScalar>(), *Lform, {});
-
-  // TODO: fill RHS
+  // Hcurl RHS vector assemble
+  auto Lform = fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
+  const int vec_size = V->dofmap()->index_map->size_local() + V->dofmap()->index_map->num_ghosts();
+  fem::assemble_vector(tcb::span<PetscScalar>(b->getDataNonConst(0).get(), vec_size), *Lform);
 
   problem->setProblem(x, b);
 
-  // TODO: call solver
+  
+  // Belos solver
+  Teuchos::RCP<Teuchos::ParameterList> solver_params = Teuchos::rcp<Teuchos::ParameterList>(new Teuchos::ParameterList());
+  Teuchos::RCP<Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>> factory 
+    = Teuchos::rcp(new Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>());
+  Teuchos::RCP<Belos::SolverManager<PetscScalar, MV, Belos::OperatorT<MV>>> solver   
+    = factory->create("Block CG", solver_params);
 
+  Belos::ReturnType status = solver->solve();
+  int iters = solver->getNumIters();
+  bool success = (iters<50 && status == Belos::Converged);
+  if (success)
+     std::cout << "SUCCESS! Belos converged in " << iters << " iterations." << std::endl;
+  else
+     std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
+    
   return 0;
 }
