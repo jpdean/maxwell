@@ -373,7 +373,7 @@ int main(int argc, char **argv) {
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       x_tp = Teuchos::rcp(
           new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat->getRowMap(), 3));
+              Kc_mat->getRowMap(), 1));
   Teuchos::RCP<MV> x = Teuchos::rcp(
       new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
           x_tp));
@@ -381,10 +381,16 @@ int main(int argc, char **argv) {
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       b_tp = Teuchos::rcp(
           new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat->getRowMap(), 3));
+              Kc_mat->getRowMap(), 1));
   Teuchos::RCP<MV> b = Teuchos::rcp(
       new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
           b_tp));
+
+
+    // Hcurl RHS vector
+  auto Lform =
+      fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
+    fem::assemble_vector(tcb::span<PetscScalar>(), *Lform, {});
 
   // TODO: fill RHS
 
