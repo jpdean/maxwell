@@ -301,7 +301,8 @@ int main(int argc, char **argv) {
       writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
 
   // TODO: set parameters
-  Teuchos::ParameterList MLList;
+  Teuchos::RCP<Teuchos::ParameterList> MLList =
+      Teuchos::getParametersFromXmlFile("Maxwell3.xml");
 
   // construct preconditioner
 
@@ -351,7 +352,7 @@ int main(int argc, char **argv) {
   Teuchos::RCP<MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>>
       refMaxwell = rcp(
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
-              A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, MLList));
+              A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, *MLList));
 
   // Create linear problem solver
   using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
@@ -386,29 +387,33 @@ int main(int argc, char **argv) {
       new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
           b_tp));
 
-
   // Hcurl RHS vector assemble
-  auto Lform = fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
-  const int vec_size = V->dofmap()->index_map->size_local() + V->dofmap()->index_map->num_ghosts();
-  fem::assemble_vector(tcb::span<PetscScalar>(b->getDataNonConst(0).get(), vec_size), *Lform);
+  auto Lform =
+      fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
+  const int vec_size = V->dofmap()->index_map->size_local() +
+                       V->dofmap()->index_map->num_ghosts();
+  fem::assemble_vector(
+      tcb::span<PetscScalar>(b->getDataNonConst(0).get(), vec_size), *Lform);
 
   problem->setProblem(x, b);
 
-  
   // Belos solver
-  Teuchos::RCP<Teuchos::ParameterList> solver_params = Teuchos::rcp<Teuchos::ParameterList>(new Teuchos::ParameterList());
-  Teuchos::RCP<Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>> factory 
-    = Teuchos::rcp(new Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>());
-  Teuchos::RCP<Belos::SolverManager<PetscScalar, MV, Belos::OperatorT<MV>>> solver   
-    = factory->create("Block CG", solver_params);
+  Teuchos::RCP<Teuchos::ParameterList> solver_params =
+      Teuchos::getParametersFromXmlFile("Belos.xml");
+  Teuchos::RCP<Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>>
+      factory = Teuchos::rcp(
+          new Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>());
+  Teuchos::RCP<Belos::SolverManager<PetscScalar, MV, Belos::OperatorT<MV>>>
+      solver = factory->create("Block CG", solver_params);
 
   Belos::ReturnType status = solver->solve();
   int iters = solver->getNumIters();
-  bool success = (iters<50 && status == Belos::Converged);
+  bool success = (iters < 50 && status == Belos::Converged);
   if (success)
-     std::cout << "SUCCESS! Belos converged in " << iters << " iterations." << std::endl;
+    std::cout << "SUCCESS! Belos converged in " << iters << " iterations."
+              << std::endl;
   else
-     std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
-    
+    std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
+
   return 0;
 }
