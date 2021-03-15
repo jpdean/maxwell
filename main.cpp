@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
-  std::size_t n = 4;
+  std::size_t n = 10;
   auto cmap = fem::create_coordinate_map(create_coordinate_map_maxwell);
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
@@ -360,15 +360,17 @@ int main(int argc, char **argv) {
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           A_Kc)); // Turns a Xpetra::Matrix object into a Belos operator
 
+  dolfinx::common::Timer t1("Belos::SetOperator");
   Teuchos::RCP<Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>>
       problem = rcp(
           new Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>());
   problem->setOperator(belosOp);
+  t1.stop();
 
+  common::Timer t2("Belos::problem::setProblem");
   Teuchos::RCP<Belos::OperatorT<MV>> belosPrecOp = Teuchos::rcp(
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           refMaxwell));
-  problem->setRightPrec(belosPrecOp);
 
   // Solution and RHS vectors
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
@@ -401,7 +403,9 @@ int main(int argc, char **argv) {
   if (!problem->setProblem())
     throw std::runtime_error(
         "Belos::LinearProblem failed to set up correctly!");
+  t2.stop();
 
+  common::Timer t3("Belos::solver::setProblem");
   // Belos solver
   Teuchos::RCP<Teuchos::ParameterList> solver_params =
       Teuchos::getParametersFromXmlFile("Belos.xml");
@@ -411,9 +415,11 @@ int main(int argc, char **argv) {
   Teuchos::RCP<Belos::SolverManager<PetscScalar, MV, Belos::OperatorT<MV>>>
       solver = factory->create("Block CG", solver_params);
   solver->setProblem(problem);
+  t3.stop();
 
-  std::cout << "Calling Belos solver\n";
+  common::Timer t5("Belos::solve");
   Belos::ReturnType status = solver->solve();
+  t5.stop();
   int iters = solver->getNumIters();
   bool success = (iters < 50 && status == Belos::Converged);
   if (success)
@@ -422,5 +428,6 @@ int main(int argc, char **argv) {
   else
     std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
 
+  dolfinx::list_timings(MPI_COMM_WORLD, {dolfinx::TimingType::wall});
   return 0;
 }
