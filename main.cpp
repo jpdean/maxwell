@@ -175,7 +175,7 @@ int main(int argc, char **argv) {
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
-  std::size_t n = 12;
+  std::size_t n = 4;
   auto cmap = fem::create_coordinate_map(create_coordinate_map_maxwell);
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
@@ -302,7 +302,7 @@ int main(int argc, char **argv) {
 
   // TODO: set parameters
   Teuchos::RCP<Teuchos::ParameterList> MLList =
-      Teuchos::getParametersFromXmlFile("Maxwell3.xml");
+      Teuchos::getParametersFromXmlFile("Maxwell.xml");
 
   // construct preconditioner
 
@@ -378,6 +378,7 @@ int main(int argc, char **argv) {
   Teuchos::RCP<MV> x = Teuchos::rcp(
       new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
           x_tp));
+  x->putScalar(Teuchos::ScalarTraits<PetscScalar>::zero());
 
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       b_tp = Teuchos::rcp(
@@ -397,6 +398,10 @@ int main(int argc, char **argv) {
 
   problem->setProblem(x, b);
 
+  if (!problem->setProblem())
+    throw std::runtime_error(
+        "Belos::LinearProblem failed to set up correctly!");
+
   // Belos solver
   Teuchos::RCP<Teuchos::ParameterList> solver_params =
       Teuchos::getParametersFromXmlFile("Belos.xml");
@@ -405,7 +410,9 @@ int main(int argc, char **argv) {
           new Belos::SolverFactory<PetscScalar, MV, Belos::OperatorT<MV>>());
   Teuchos::RCP<Belos::SolverManager<PetscScalar, MV, Belos::OperatorT<MV>>>
       solver = factory->create("Block CG", solver_params);
+  solver->setProblem(problem);
 
+  std::cout << "Calling Belos solver\n";
   Belos::ReturnType status = solver->solve();
   int iters = solver->getNumIters();
   bool success = (iters < 50 && status == Belos::Converged);

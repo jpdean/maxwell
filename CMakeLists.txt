@@ -10,8 +10,11 @@ project(${PROJECT_NAME})
 # Get DOLFINX configuration data (DOLFINXConfig.cmake must be in
 # DOLFINX_CMAKE_CONFIG_PATH)
 if (NOT TARGET dolfinx)
-  find_package(DOLFINX REQUIRED)
+  find_package(DOLFINX REQUIRED)  
+  find_package(Basix REQUIRED)
 endif()
+
+find_package(Trilinos REQUIRED)
 
 # Executable
 add_executable(${PROJECT_NAME} maxwell.c main.cpp)
@@ -19,7 +22,6 @@ add_executable(${PROJECT_NAME} maxwell.c main.cpp)
 # Set C++17 standard
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
 
-find_package(Trilinos REQUIRED)
 target_include_directories(${PROJECT_NAME} PRIVATE ${Trilinos_INCLUDE_DIRS})
 
 # Target libraries
