@@ -190,6 +190,7 @@ int main(int argc, char **argv) {
   auto Q = fem::create_functionspace(create_functionspace_form_maxwell_Mg, "u",
                                      mesh);
 
+  common::Timer tcreate("Tpetra: create matrices");
   // Hcurl stiffness matrix
   auto Kc =
       fem::create_form<PetscScalar>(create_form_maxwell_Kc, {V, V}, {}, {}, {});
@@ -249,7 +250,6 @@ int main(int argc, char **argv) {
   la::SparsityPattern D0_sp = fem::create_sparsity_discrete_gradient(*V, *Q);
   auto D0_mat = create_tpetra_matrix(mesh->mpi_comm(), D0_sp);
 
-  // TODO - allocate D0_mat
   std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
                     const std::int32_t *, const PetscScalar *)>
       mat_set_dg = [&D0_mat](int nr, const int *rows, int nc, const int *cols,
@@ -265,6 +265,25 @@ int main(int argc, char **argv) {
   fem::assemble_discrete_gradient(mat_set_dg, *V, *Q);
   D0_mat->fillComplete();
 
+  // Get nodal coordinates
+  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+      coords = Teuchos::rcp(
+          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
+              Mg_mat->getRowMap(), 3));
+  fem::Function<double> xcoord(Q);
+  for (int j = 0; j < 3; ++j) {
+    common::Timer time_interpolate("Interpolate x");
+    xcoord.interpolate([&j](auto &x) {
+      return std::vector<PetscScalar>(x.row(j).begin(), x.row(j).end());
+    });
+    time_interpolate.stop();
+    for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
+      coords->replaceLocalValue(i, j, xcoord.x()->array()[i]);
+  }
+
+  tcreate.stop();
+
+  common::Timer tw("Tpetra: write files");
   Tpetra::MatrixMarket::Writer<
       Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
       writeSparseFile("D0.mat", *D0_mat, "D0", "Edge-based discrete gradient");
@@ -282,23 +301,10 @@ int main(int argc, char **argv) {
       Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
       writeSparseFile("Kc.mat", *Kc_mat, "Kc", "Hcurl stiffness matrix");
 
-  // Get nodal coordinates
-  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
-      coords = Teuchos::rcp(
-          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
-              Mg_mat->getRowMap(), 3));
-  fem::Function<double> xcoord(Q);
-  for (int j = 0; j < 3; ++j) {
-    xcoord.interpolate([&j](auto &x) {
-      return std::vector<PetscScalar>(x.row(j).begin(), x.row(j).end());
-    });
-    for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
-      coords->replaceLocalValue(i, j, xcoord.x()->array()[i]);
-  }
-
   Tpetra::MatrixMarket::Writer<
       Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>::
       writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
+  tw.stop();
 
   // TODO: set parameters
   Teuchos::RCP<Teuchos::ParameterList> MLList =
@@ -307,7 +313,7 @@ int main(int argc, char **argv) {
   // construct preconditioner
 
   // Ridiculous casting/copying to Xpetra objects... can this be fixed?
-
+  common::Timer t0("refMaxwell::create");
   Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
       Kc_mat_X =
           Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
@@ -359,6 +365,7 @@ int main(int argc, char **argv) {
   Teuchos::RCP<Belos::OperatorT<MV>> belosOp = Teuchos::rcp(
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           A_Kc)); // Turns a Xpetra::Matrix object into a Belos operator
+  t0.stop();
 
   dolfinx::common::Timer t1("Belos::SetOperator");
   Teuchos::RCP<Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>>
