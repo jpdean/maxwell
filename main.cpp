@@ -378,6 +378,7 @@ int main(int argc, char **argv) {
   Teuchos::RCP<Belos::OperatorT<MV>> belosPrecOp = Teuchos::rcp(
       new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
           refMaxwell));
+  problem->setRightPrec(belosPrecOp);
 
   // Solution and RHS vectors
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
@@ -404,6 +405,7 @@ int main(int argc, char **argv) {
                        V->dofmap()->index_map->num_ghosts();
   fem::assemble_vector(
       tcb::span<PetscScalar>(b->getDataNonConst(0).get(), vec_size), *Lform);
+  // TODO: scatter vector after assembly, in parallel
 
   problem->setProblem(x, b);
 
@@ -428,7 +430,7 @@ int main(int argc, char **argv) {
   Belos::ReturnType status = solver->solve();
   t5.stop();
   int iters = solver->getNumIters();
-  bool success = (iters < 50 && status == Belos::Converged);
+  bool success = (iters < 500 && status == Belos::Converged);
   if (success)
     std::cout << "SUCCESS! Belos converged in " << iters << " iterations."
               << std::endl;
