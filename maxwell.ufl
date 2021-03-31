@@ -16,7 +16,7 @@ T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
 A = TrialFunction(Q)
 v = TestFunction(Q)
 
-Kc = inner(1 / mu * curl(A), curl(v)) * dx + 0.01 * inner(A, v)*dx
+Kc = inner(1 / mu * curl(A), curl(v)) * dx + 1e-8 * inner(A, v)*dx
 Mc = inner(A, v)*dx
 L = inner(T_0, curl(v)) * dx
 

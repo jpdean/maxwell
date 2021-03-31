@@ -403,9 +403,13 @@ int main(int argc, char **argv) {
       fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
   const int vec_size = V->dofmap()->index_map->size_local() +
                        V->dofmap()->index_map->num_ghosts();
-  fem::assemble_vector(
-      tcb::span<PetscScalar>(b->getDataNonConst(0).get(), vec_size), *Lform);
-  // TODO: scatter vector after assembly, in parallel
+  dolfinx::la::Vector<PetscScalar> _b(V->dofmap()->index_map, 1);
+  dolfinx::fem::assemble_vector(tcb::span<PetscScalar>(_b.mutable_array()),
+                                *Lform);
+  dolfinx::la::scatter_rev(_b, dolfinx::common::IndexMap::Mode::add);
+  std::copy(_b.array().begin(),
+            _b.array().begin() + V->dofmap()->index_map->size_local(),
+            b->getDataNonConst(0).get());
 
   problem->setProblem(x, b);
 
