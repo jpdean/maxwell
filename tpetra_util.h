@@ -26,6 +26,7 @@ using Node = Kokkos::Compat::KokkosSerialWrapperNode;
 
 #include <dolfinx/common/IndexMap.h>
 #include <dolfinx/common/Timer.h>
+#include <dolfinx/fem/Form.h>
 #include <dolfinx/la/SparsityPattern.h>
 
 /// Helper functions to create Tpetra::CrsMatrix from
@@ -41,6 +42,16 @@ template <typename T>
 Teuchos::RCP<Tpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>>
 create_tpetra_diagonal_matrix(
     std::shared_ptr<const dolfinx::common::IndexMap> index_map);
+
+template <typename T>
+Teuchos::RCP<Tpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>>
+create_tpetra_matrix(MPI_Comm mpi_comm, const dolfinx::fem::Form<T> &form) {
+
+  dolfinx::la::SparsityPattern pattern =
+      dolfinx::fem::create_sparsity_pattern(form);
+  pattern.assemble();
+  return create_tpetra_matrix<T>(mpi_comm, pattern);
+}
 
 template <typename T>
 Teuchos::RCP<Tpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>>

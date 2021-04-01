@@ -93,20 +93,14 @@ int main(int argc, char **argv) {
   // Hcurl stiffness matrix
   auto Kc =
       fem::create_form<PetscScalar>(create_form_maxwell_Kc, {V, V}, {}, {}, {});
-  dolfinx::la::SparsityPattern Kc_pattern =
-      dolfinx::fem::create_sparsity_pattern(*Kc);
-  Kc_pattern.assemble();
-  auto Kc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), Kc_pattern);
+  auto Kc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Kc);
   tpetra_assemble(Kc_mat, *Kc);
   Kc_mat->fillComplete();
 
   // Hcurl mass matrix
   auto Mc =
       fem::create_form<PetscScalar>(create_form_maxwell_Mc, {V, V}, {}, {}, {});
-  dolfinx::la::SparsityPattern Mc_pattern =
-      dolfinx::fem::create_sparsity_pattern(*Mc);
-  Mc_pattern.assemble();
-  auto Mc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), Mc_pattern);
+  auto Mc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Mc);
   tpetra_assemble(Mc_mat, *Mc);
   Mc_mat->fillComplete();
 
@@ -165,28 +159,33 @@ int main(int argc, char **argv) {
 
   tcreate.stop();
 
-  common::Timer tw("Tpetra: write files");
-  Tpetra::MatrixMarket::Writer<
-      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
-      writeSparseFile("D0.mat", *D0_mat, "D0", "Edge-based discrete gradient");
+  bool write_files = false;
 
-  Tpetra::MatrixMarket::Writer<
-      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
-      writeSparseFile("Mg.mat", *Mg_mat, "Mg",
-                      "Lumped inverse Hgrad mass matrix");
+  if (write_files) {
+    common::Timer tw("Tpetra: write files");
+    Tpetra::MatrixMarket::Writer<
+        Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
+        writeSparseFile("D0.mat", *D0_mat, "D0",
+                        "Edge-based discrete gradient");
 
-  Tpetra::MatrixMarket::Writer<
-      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
-      writeSparseFile("Mc.mat", *Mc_mat, "Mc", "Hcurl mass matrix");
+    Tpetra::MatrixMarket::Writer<
+        Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
+        writeSparseFile("Mg.mat", *Mg_mat, "Mg",
+                        "Lumped inverse Hgrad mass matrix");
 
-  Tpetra::MatrixMarket::Writer<
-      Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
-      writeSparseFile("Kc.mat", *Kc_mat, "Kc", "Hcurl stiffness matrix");
+    Tpetra::MatrixMarket::Writer<
+        Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
+        writeSparseFile("Mc.mat", *Mc_mat, "Mc", "Hcurl mass matrix");
 
-  Tpetra::MatrixMarket::Writer<
-      Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>::
-      writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
-  tw.stop();
+    Tpetra::MatrixMarket::Writer<
+        Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
+        writeSparseFile("Kc.mat", *Kc_mat, "Kc", "Hcurl stiffness matrix");
+
+    Tpetra::MatrixMarket::Writer<
+        Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>::
+        writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
+    tw.stop();
+  }
 
   common::Timer t0("refMaxwell::create");
   auto A_Kc = tpetra_to_xpetra(Kc_mat);
@@ -207,7 +206,7 @@ int main(int argc, char **argv) {
   auto problem = create_belos_problem<PetscScalar>(A_Kc, refMaxwell);
   using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
 
-  // Solution and RHS vectors
+  // Solution vector
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       x_tp = Teuchos::rcp(
           new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
@@ -217,6 +216,7 @@ int main(int argc, char **argv) {
           x_tp));
   x->putScalar(Teuchos::ScalarTraits<PetscScalar>::zero());
 
+  // RHS vector
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
       b_tp = Teuchos::rcp(
           new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
