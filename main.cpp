@@ -24,116 +24,6 @@
 #include <BelosSolverFactory.hpp>
 #include <BelosXpetraAdapter.hpp>
 
-// using Node = Kokkos::Compat::KokkosSerialWrapperNode;
-
-// Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-// Node>> create_tpetra_matrix(MPI_Comm mpi_comm,
-//                      const dolfinx::la::SparsityPattern &pattern) {
-//   Teuchos::RCP<const Teuchos::Comm<int>> comm =
-//       Teuchos::rcp(new Teuchos::MpiComm<int>(mpi_comm));
-
-//   std::cout << "Sparsity = " << pattern.index_map(0)->size_global() << "x"
-//             << pattern.index_map(1)->size_global() << "\n";
-
-//   const dolfinx::graph::AdjacencyList<std::int32_t> &diagonal_pattern =
-//       pattern.diagonal_pattern();
-//   const dolfinx::graph::AdjacencyList<std::int32_t> &off_diagonal_pattern =
-//       pattern.off_diagonal_pattern();
-
-//   std::vector<std::size_t> nnz(diagonal_pattern.num_nodes());
-//   for (int i = 0; i < diagonal_pattern.num_nodes(); ++i)
-//     nnz[i] = diagonal_pattern.num_links(i) +
-//     off_diagonal_pattern.num_links(i);
-
-//   dolfinx::common::Timer tcre("Trilinos: create sparsity");
-//   std::vector<std::int64_t> global_indices1 = pattern.column_indices();
-
-//   const Teuchos::ArrayView<const std::int64_t> global_index_view1(
-//       global_indices1.data(), global_indices1.size());
-//   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t, Node>> colMap =
-//       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t, Node>(
-//           pattern.index_map(1)->size_global(), global_index_view1, 0, comm));
-
-//   // Column map with no ghosts = domain map (needed for rectangular matrix)
-//   const Teuchos::ArrayView<const std::int64_t> global_index_view1_domain(
-//       global_indices1.data(), pattern.index_map(1)->size_local());
-//   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t, Node>> domainMap
-//   =
-//       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t, Node>(
-//           pattern.index_map(1)->size_global(), global_index_view1_domain, 0,
-//           comm));
-
-//   std::vector<std::int64_t> global_indices0 =
-//       pattern.index_map(0)->global_indices();
-//   const Teuchos::ArrayView<const std::int64_t> global_index_view0(
-//       global_indices0.data(), pattern.index_map(0)->size_local());
-//   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t, Node>> vecMap =
-//       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t, Node>(
-//           pattern.index_map(0)->size_global(), global_index_view0, 0, comm));
-
-//   Teuchos::ArrayView<std::size_t> _nnz(nnz.data(), nnz.size());
-//   Teuchos::RCP<Tpetra::CrsGraph<std::int32_t, std::int64_t, Node>> crs_graph(
-//       new Tpetra::CrsGraph<std::int32_t, std::int64_t, Node>(vecMap, colMap,
-//                                                              _nnz));
-
-//   const std::int64_t nlocalrows = pattern.index_map(0)->size_local();
-//   for (std::size_t i = 0; i != diagonal_pattern.num_nodes(); ++i) {
-//     std::vector<std::int32_t> indices(diagonal_pattern.links(i).begin(),
-//                                       diagonal_pattern.links(i).end());
-//     for (std::int32_t q : off_diagonal_pattern.links(i))
-//       indices.push_back(q);
-
-//     Teuchos::ArrayView<std::int32_t> _indices(indices.data(),
-//     indices.size()); crs_graph->insertLocalIndices(i, _indices);
-//   }
-
-//   crs_graph->fillComplete(domainMap, vecMap);
-//   tcre.stop();
-
-//   Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-//   Node>>
-//       A_Tpetra = Teuchos::rcp(
-//           new Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-//           Node>(
-//               crs_graph));
-//   return A_Tpetra;
-// }
-
-// Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-// Node>> create_tpetra_diagonal_matrix(
-//     std::shared_ptr<const common::IndexMap> index_map) {
-
-//   Teuchos::RCP<const Teuchos::Comm<int>> comm =
-//       Teuchos::rcp(new Teuchos::MpiComm<int>(index_map->comm()));
-
-//   // Get non-ghost global indices only
-//   std::vector<std::int64_t> global_indices = index_map->global_indices();
-//   global_indices.resize(index_map->size_local());
-
-//   Teuchos::RCP<const Tpetra::Map<std::int32_t, std::int64_t, Node>> vecMap =
-//       Teuchos::rcp(new Tpetra::Map<std::int32_t, std::int64_t, Node>(
-//           index_map->size_global(), global_indices, 0, comm));
-
-//   Teuchos::RCP<Tpetra::CrsGraph<std::int32_t, std::int64_t, Node>> crs_graph(
-//       new Tpetra::CrsGraph<std::int32_t, std::int64_t, Node>(vecMap, vecMap,
-//                                                              1));
-
-//   for (std::size_t i = 0; i != index_map->size_local(); ++i) {
-//     std::vector<std::int32_t> indices(1, i);
-//     crs_graph->insertLocalIndices(i, indices);
-//   }
-
-//   crs_graph->fillComplete();
-
-//   Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-//   Node>>
-//       A_Tpetra = Teuchos::rcp(
-//           new Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t,
-//           Node>(
-//               crs_graph));
-//   return A_Tpetra;
-// }
-
 void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
                                                     std::int64_t, Node>>
                          A_Tpetra,
@@ -314,55 +204,15 @@ int main(int argc, char **argv) {
       writeDenseFile("coords.mat", *coords, "coords", "Nodal coordinates");
   tw.stop();
 
-  // TODO: set parameters
+  common::Timer t0("refMaxwell::create");
+  auto A_Kc = tpetra_to_xpetra(Kc_mat);
+  auto A_Mc = tpetra_to_xpetra(Mc_mat);
+  auto A_Mg = tpetra_to_xpetra(Mg_mat);
+  auto A_D0 = tpetra_to_xpetra(D0_mat);
+  auto A_coords = tpetra_to_xpetra(coords);
+
   Teuchos::RCP<Teuchos::ParameterList> MLList =
       Teuchos::getParametersFromXmlFile("Maxwell.xml");
-
-  // construct preconditioner
-
-  // Ridiculous casting/copying to Xpetra objects... can this be fixed?
-  common::Timer t0("refMaxwell::create");
-  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      Kc_mat_X =
-          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
-                                                   std::int64_t, Node>(Kc_mat));
-  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      A_Kc =
-          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
-                                                 std::int64_t, Node>(Kc_mat_X));
-
-  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      Mc_mat_X =
-          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
-                                                   std::int64_t, Node>(Mc_mat));
-  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      A_Mc =
-          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
-                                                 std::int64_t, Node>(Mc_mat_X));
-
-  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      Mg_mat_X =
-          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
-                                                   std::int64_t, Node>(Mg_mat));
-  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      A_Mg =
-          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
-                                                 std::int64_t, Node>(Mg_mat_X));
-
-  Teuchos::RCP<Xpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      D0_mat_X =
-          Teuchos::rcp(new Xpetra::TpetraCrsMatrix<PetscScalar, std::int32_t,
-                                                   std::int64_t, Node>(D0_mat));
-  Teuchos::RCP<Xpetra::Matrix<PetscScalar, std::int32_t, std::int64_t, Node>>
-      A_D0 =
-          Teuchos::rcp(new Xpetra::CrsMatrixWrap<PetscScalar, std::int32_t,
-                                                 std::int64_t, Node>(D0_mat_X));
-
-  Teuchos::RCP<Xpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
-      A_coords = Teuchos::rcp(
-          new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t,
-                                        Node>(coords));
-
   Teuchos::RCP<MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>>
       refMaxwell = rcp(
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(

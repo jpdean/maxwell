@@ -4,6 +4,11 @@
 
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
+#include <Xpetra_CrsMatrix.hpp>
+#include <Xpetra_CrsMatrixFactory.hpp>
+#include <Xpetra_CrsMatrixWrap_fwd.hpp>
+#include <Xpetra_Matrix_fwd.hpp>
+
 using Node = Kokkos::Compat::KokkosSerialWrapperNode;
 
 #include <dolfinx/common/IndexMap.h>
@@ -126,4 +131,29 @@ create_tpetra_diagonal_matrix(
           new Tpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>(
               crs_graph));
   return A_Tpetra;
+}
+
+/// Convert Tpetra to Xpetra...
+template <typename T>
+Teuchos::RCP<Xpetra::Matrix<T, std::int32_t, std::int64_t, Node>>
+tpetra_to_xpetra(
+    Teuchos::RCP<Tpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>> mat) {
+  Teuchos::RCP<Xpetra::CrsMatrix<T, std::int32_t, std::int64_t, Node>> mat_X =
+      Teuchos::rcp(
+          new Xpetra::TpetraCrsMatrix<T, std::int32_t, std::int64_t, Node>(
+              mat));
+
+  Teuchos::RCP<Xpetra::Matrix<T, std::int32_t, std::int64_t, Node>> A_mat =
+      Teuchos::rcp(
+          new Xpetra::CrsMatrixWrap<T, std::int32_t, std::int64_t, Node>(
+              mat_X));
+  return A_mat;
+}
+
+template <typename T>
+Teuchos::RCP<Xpetra::MultiVector<T, std::int32_t, std::int64_t, Node>>
+tpetra_to_xpetra(
+    Teuchos::RCP<Tpetra::MultiVector<T, std::int32_t, std::int64_t, Node>> mv) {
+  return Teuchos::rcp(
+      new Xpetra::TpetraMultiVector<T, std::int32_t, std::int64_t, Node>(mv));
 }
