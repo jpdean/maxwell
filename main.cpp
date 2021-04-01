@@ -1,4 +1,5 @@
 
+#include "lumping.h"
 #include "maxwell.h"
 #include "tpetra_util.h"
 
@@ -112,32 +113,15 @@ int main(int argc, char **argv) {
   // Inverse lumped Hgrad mass matrix
   auto Mg =
       fem::create_form<PetscScalar>(create_form_maxwell_Mg, {Q, Q}, {}, {}, {});
-  std::shared_ptr<const common::IndexMap> qmap = Q->dofmap()->index_map;
-  // Lump mass matrix into diagonal vector
-  la::Vector<PetscScalar> Mg_vec(qmap, 1);
-  std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
-                    const std::int32_t *, const PetscScalar *)>
-      lumper = [&Mg_vec](int nr, const int *rows, int nc, const int *cols,
-                         const PetscScalar *vals) {
-        std::vector<PetscScalar> &Mg_data = Mg_vec.mutable_array();
-        for (int i = 0; i < nr; ++i) {
-          for (int j = 0; j < nc; ++j) {
-            Mg_data[rows[i]] += vals[i * nc + j];
-          }
-        }
-        return 0;
-      };
-
-  fem::assemble_matrix(lumper, *Mg, {});
-  // Gather and add ghost entries
-  la::scatter_rev(Mg_vec, common::IndexMap::Mode::add);
+  la::Vector<PetscScalar> Mg_vec = create_lumped_diagonal(*Mg);
 
   // Invert local values and insert into the diagonal of a matrix
   const std::vector<PetscScalar> &vals = Mg_vec.array();
-  auto Mg_mat = create_tpetra_diagonal_matrix<PetscScalar>(qmap);
+  auto Mg_mat =
+      create_tpetra_diagonal_matrix<PetscScalar>(Q->dofmap()->index_map);
   std::vector<std::int32_t> col(1);
   std::vector<PetscScalar> val(1);
-  for (int i = 0; i < qmap->size_local(); ++i) {
+  for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i) {
     col[0] = i;
     val[0] = 1.0 / vals[i];
     Mg_mat->replaceLocalValues(i, col, val);
@@ -217,26 +201,11 @@ int main(int argc, char **argv) {
       refMaxwell = rcp(
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
               A_Kc, A_D0, A_Mg, A_Mc, Teuchos::null, A_coords, *MLList));
-
-  // Create linear problem solver
-  using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
-  Teuchos::RCP<Belos::OperatorT<MV>> belosOp = Teuchos::rcp(
-      new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
-          A_Kc)); // Turns a Xpetra::Matrix object into a Belos operator
   t0.stop();
 
-  dolfinx::common::Timer t1("Belos::SetOperator");
-  Teuchos::RCP<Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>>
-      problem = rcp(
-          new Belos::LinearProblem<PetscScalar, MV, Belos::OperatorT<MV>>());
-  problem->setOperator(belosOp);
-  t1.stop();
-
-  common::Timer t2("Belos::problem::setProblem");
-  Teuchos::RCP<Belos::OperatorT<MV>> belosPrecOp = Teuchos::rcp(
-      new Belos::XpetraOp<PetscScalar, std::int32_t, std::int64_t, Node>(
-          refMaxwell));
-  problem->setRightPrec(belosPrecOp);
+  // Create linear problem solver with operator and preconditioner
+  auto problem = create_belos_problem<PetscScalar>(A_Kc, refMaxwell);
+  using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
 
   // Solution and RHS vectors
   Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
@@ -274,7 +243,6 @@ int main(int argc, char **argv) {
   if (!problem->setProblem())
     throw std::runtime_error(
         "Belos::LinearProblem failed to set up correctly!");
-  t2.stop();
 
   common::Timer t3("Belos::solver::setProblem");
   // Belos solver

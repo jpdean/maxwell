@@ -4,10 +4,23 @@
 
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
+
 #include <Xpetra_CrsMatrix.hpp>
 #include <Xpetra_CrsMatrixFactory.hpp>
 #include <Xpetra_CrsMatrixWrap_fwd.hpp>
+#include <Xpetra_IO.hpp>
+#include <Xpetra_Map.hpp>
+#include <Xpetra_MapFactory.hpp>
 #include <Xpetra_Matrix_fwd.hpp>
+#include <Xpetra_MultiVector.hpp>
+#include <Xpetra_MultiVectorFactory.hpp>
+#include <Xpetra_Parameters.hpp>
+#include <Xpetra_Vector.hpp>
+
+#include <BelosConfigDefs.hpp>
+#include <BelosLinearProblem.hpp>
+#include <BelosSolverFactory.hpp>
+#include <BelosXpetraAdapter.hpp>
 
 using Node = Kokkos::Compat::KokkosSerialWrapperNode;
 
@@ -156,4 +169,31 @@ tpetra_to_xpetra(
     Teuchos::RCP<Tpetra::MultiVector<T, std::int32_t, std::int64_t, Node>> mv) {
   return Teuchos::rcp(
       new Xpetra::TpetraMultiVector<T, std::int32_t, std::int64_t, Node>(mv));
+}
+
+template <typename T>
+Teuchos::RCP<Belos::LinearProblem<
+    T, Xpetra::MultiVector<T, std::int32_t, std::int64_t, Node>,
+    Belos::OperatorT<Xpetra::MultiVector<T, std::int32_t, std::int64_t, Node>>>>
+create_belos_problem(
+    Teuchos::RCP<Xpetra::Matrix<T, std::int32_t, std::int64_t, Node>> op,
+    Teuchos::RCP<Xpetra::Operator<T, std::int32_t, std::int64_t, Node>> prec) {
+
+  using MV = Xpetra::MultiVector<T, std::int32_t, std::int64_t, Node>;
+
+  Teuchos::RCP<Belos::OperatorT<MV>> belosOp =
+      Teuchos::rcp(new Belos::XpetraOp<T, std::int32_t, std::int64_t, Node>(
+          op)); // Turns a Xpetra::Matrix object into a Belos operator
+
+  // Set operator
+  Teuchos::RCP<Belos::LinearProblem<T, MV, Belos::OperatorT<MV>>> problem =
+      rcp(new Belos::LinearProblem<T, MV, Belos::OperatorT<MV>>());
+  problem->setOperator(belosOp);
+
+  // Set preconditioner
+  Teuchos::RCP<Belos::OperatorT<MV>> belosPrecOp = Teuchos::rcp(
+      new Belos::XpetraOp<T, std::int32_t, std::int64_t, Node>(prec));
+  problem->setRightPrec(belosPrecOp);
+
+  return problem;
 }
