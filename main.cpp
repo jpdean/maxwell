@@ -74,39 +74,45 @@ int main(int argc, char **argv) {
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
-  std::size_t n = 10;
-  auto cmap = fem::create_coordinate_map(create_coordinate_map_maxwell);
+  std::size_t n = 20;
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
-          MPI_COMM_WORLD, {{{0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}}}, {n, n, n}, cmap,
-          mesh::GhostMode::none));
+          MPI_COMM_WORLD, {{{0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}}}, {n, n, n},
+          mesh::CellType::tetrahedron, mesh::GhostMode::none));
 
   // N1curl space for Kc and Mc
-  auto V = fem::create_functionspace(create_functionspace_form_maxwell_Mc, "A",
-                                     mesh);
+  auto V = fem::create_functionspace(functionspace_form_maxwell_Mc, "A", mesh);
 
   // Lagrange space for Mg
-  auto Q = fem::create_functionspace(create_functionspace_form_maxwell_Mg, "u",
-                                     mesh);
+  auto Q = fem::create_functionspace(functionspace_form_maxwell_Mg, "u", mesh);
 
   common::Timer tcreate("Tpetra: create matrices");
   // Hcurl stiffness matrix
   auto Kc =
-      fem::create_form<PetscScalar>(create_form_maxwell_Kc, {V, V}, {}, {}, {});
+      std::make_shared<fem::Form<PetscScalar>>(fem::create_form<PetscScalar>(
+          *form_maxwell_Kc, {V, V},
+          std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
+          {}));
   auto Kc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Kc);
   tpetra_assemble(Kc_mat, *Kc);
   Kc_mat->fillComplete();
 
   // Hcurl mass matrix
   auto Mc =
-      fem::create_form<PetscScalar>(create_form_maxwell_Mc, {V, V}, {}, {}, {});
+      std::make_shared<fem::Form<PetscScalar>>(fem::create_form<PetscScalar>(
+          *form_maxwell_Mc, {V, V},
+          std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
+          {}));
   auto Mc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Mc);
   tpetra_assemble(Mc_mat, *Mc);
   Mc_mat->fillComplete();
 
   // Inverse lumped Hgrad mass matrix
   auto Mg =
-      fem::create_form<PetscScalar>(create_form_maxwell_Mg, {Q, Q}, {}, {}, {});
+      std::make_shared<fem::Form<PetscScalar>>(fem::create_form<PetscScalar>(
+          *form_maxwell_Mg, {Q, Q},
+          std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
+          {}));
   la::Vector<PetscScalar> Mg_vec = create_lumped_diagonal(*Mg);
 
   // Invert local values and insert into the diagonal of a matrix
@@ -149,9 +155,10 @@ int main(int argc, char **argv) {
   fem::Function<double> xcoord(Q);
   for (int j = 0; j < 3; ++j) {
     common::Timer time_interpolate("Interpolate x");
-    xcoord.interpolate([&j](auto &x) {
-      return std::vector<PetscScalar>(x.row(j).begin(), x.row(j).end());
-    });
+    xcoord.interpolate(
+        [&j](const xt::xtensor<double, 2> &x) -> xt::xarray<double> {
+          return xt::row(x, j);
+        });
     time_interpolate.stop();
     for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
       coords->replaceLocalValue(i, j, xcoord.x()->array()[i]);
@@ -207,27 +214,32 @@ int main(int argc, char **argv) {
   using MV = Xpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>;
 
   // Solution vector
-  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+  Teuchos::RCP<
+      Tpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>>
       x_tp = Teuchos::rcp(
-          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat->getRowMap(), 1));
-  Teuchos::RCP<MV> x = Teuchos::rcp(
-      new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
-          x_tp));
+          new Tpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t,
+                                  Node>(Kc_mat->getRowMap(), 1));
+  Teuchos::RCP<MV> x =
+      Teuchos::rcp(new Xpetra::TpetraMultiVector<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(x_tp));
   x->putScalar(Teuchos::ScalarTraits<PetscScalar>::zero());
 
   // RHS vector
-  Teuchos::RCP<Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>>
+  Teuchos::RCP<
+      Tpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t, Node>>
       b_tp = Teuchos::rcp(
-          new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
-              Kc_mat->getRowMap(), 1));
-  Teuchos::RCP<MV> b = Teuchos::rcp(
-      new Xpetra::TpetraMultiVector<double, std::int32_t, std::int64_t, Node>(
-          b_tp));
+          new Tpetra::MultiVector<PetscScalar, std::int32_t, std::int64_t,
+                                  Node>(Kc_mat->getRowMap(), 1));
+  Teuchos::RCP<MV> b =
+      Teuchos::rcp(new Xpetra::TpetraMultiVector<PetscScalar, std::int32_t,
+                                                 std::int64_t, Node>(b_tp));
 
   // Hcurl RHS vector assemble
   auto Lform =
-      fem::create_form<PetscScalar>(create_form_maxwell_L, {V}, {}, {}, {});
+      std::make_shared<fem::Form<PetscScalar>>(fem::create_form<PetscScalar>(
+          *form_maxwell_L, {V},
+          std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
+          {}));
   const int vec_size = V->dofmap()->index_map->size_local() +
                        V->dofmap()->index_map->num_ghosts();
   dolfinx::la::Vector<PetscScalar> _b(V->dofmap()->index_map, 1);
