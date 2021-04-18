@@ -11,7 +11,7 @@ from ufl import TrialFunction, TestFunction, inner, dx, curl, as_vector
 from util import project
 from dolfinx.fem import assemble_matrix, assemble_vector
 from petsc4py import PETSc
-from dolfinx.cpp.fem import build_discrete_gradient
+from dolfinx.cpp.fem import create_discrete_gradient
 import numpy as np
 from dolfinx.common import Timer
 
@@ -60,8 +60,8 @@ def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
         pc.setHYPREType("ams")
 
         # Build discrete gradient
-        G = build_discrete_gradient(V._cpp_object,
-                                    FunctionSpace(mesh, ("CG", 1))._cpp_object)
+        G = create_discrete_gradient(V._cpp_object,
+                                     FunctionSpace(mesh, ("CG", 1))._cpp_object)
 
         # Attach discrete gradient to preconditioner
         pc.setHYPREDiscreteGradient(G)
