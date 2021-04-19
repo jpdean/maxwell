@@ -292,6 +292,8 @@ int main(int argc, char **argv) {
                               {{bc}}, {}, 1.0);
 
   dolfinx::la::scatter_rev(_b, dolfinx::common::IndexMap::Mode::add);
+  fem::set_bc(xtl::span<PetscScalar>(_b.mutable_array()), {bc});
+
   std::copy(_b.array().begin(),
             _b.array().begin() + V->dofmap()->index_map->size_local(),
             b->getDataNonConst(0).get());
