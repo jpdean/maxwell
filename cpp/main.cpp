@@ -129,6 +129,8 @@ int main(int argc, char **argv) {
       Kc_set = [Kc_mat](std::int32_t nr, const std::int32_t *rows,
                         std::int32_t nc, const std::int32_t *cols,
                         const PetscScalar *data) -> int {
+    if (nr > 1 or nc > 1)
+      throw std::runtime_error("Error setting diagonal");
     Teuchos::ArrayView<const int> col_view(cols, 1);
     Teuchos::ArrayView<const PetscScalar> data_view(data, 1);
     Kc_mat->replaceLocalValues(*rows, col_view, data_view);
