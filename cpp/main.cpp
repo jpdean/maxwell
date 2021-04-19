@@ -86,6 +86,28 @@ int main(int argc, char **argv) {
   // Lagrange space for Mg
   auto Q = fem::create_functionspace(functionspace_form_maxwell_Mg, "u", mesh);
 
+  const int tdim = mesh->topology().dim();
+  // Find facets with bc applied
+  const std::vector<std::int32_t> bc_facets = dolfinx::mesh::locate_entities(
+      *mesh, tdim - 1,
+      [](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1> {
+        return xt::isclose(xt::row(x, 0), 0.0) or xt::isclose(xt::row(x, 0), 1.0)
+        or xt::isclose(xt::row(x, 1), 0.0) or xt::isclose(xt::row(x, 1), 1.0)
+        or xt::isclose(xt::row(x, 2), 0.0) or xt::isclose(xt::row(x, 2), 1.0);
+      });
+
+  // Find constrained dofs
+  const std::vector<std::int32_t> bdofs
+      = dolfinx::fem::locate_dofs_topological(*V, tdim - 1, bc_facets);
+    
+  std::cout << "Number of boundary dofs = " << bdofs.size() << std::endl;
+
+  // Define boundary condition
+  auto u0 = std::make_shared<dolfinx::fem::Function<PetscScalar>>(V);
+  std::fill(u0->x()->mutable_array().begin(), u0->x()->mutable_array().end(),
+            0.0);
+  auto bc = std::make_shared<dolfinx::fem::DirichletBC<PetscScalar>>(u0, bdofs);
+
   common::Timer tcreate("Tpetra: create matrices");
   // Hcurl stiffness matrix
   auto Kc =
