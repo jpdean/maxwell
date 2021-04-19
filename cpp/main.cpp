@@ -25,12 +25,13 @@
 #include <BelosSolverFactory.hpp>
 #include <BelosXpetraAdapter.hpp>
 
-void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
-                                                    std::int64_t, Node>>
-                         A_Tpetra,
-                     const fem::Form<PetscScalar> &form,
-                     std::vector<std::shared_ptr<const dolfinx::fem::DirichletBC<PetscScalar>>> bcs
-                     ) {
+void tpetra_assemble(
+    Teuchos::RCP<
+        Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>
+        A_Tpetra,
+    const fem::Form<PetscScalar> &form,
+    const std::vector<
+        std::shared_ptr<const dolfinx::fem::DirichletBC<PetscScalar>>> &bcs) {
 
   std::vector<std::int64_t> global_cols; // temp for columns
   const std::shared_ptr<const fem::FunctionSpace> V = form.function_spaces()[0];
@@ -92,16 +93,19 @@ int main(int argc, char **argv) {
   // Find facets with bc applied
   const std::vector<std::int32_t> bc_facets = dolfinx::mesh::locate_entities(
       *mesh, tdim - 1,
-      [](const xt::xtensor<double, 2>& x) -> xt::xtensor<bool, 1> {
-        return xt::isclose(xt::row(x, 0), 0.0) or xt::isclose(xt::row(x, 0), 1.0)
-        or xt::isclose(xt::row(x, 1), 0.0) or xt::isclose(xt::row(x, 1), 1.0)
-        or xt::isclose(xt::row(x, 2), 0.0) or xt::isclose(xt::row(x, 2), 1.0);
+      [](const xt::xtensor<double, 2> &x) -> xt::xtensor<bool, 1> {
+        return xt::isclose(xt::row(x, 0), 0.0) or
+               xt::isclose(xt::row(x, 0), 1.0) or
+               xt::isclose(xt::row(x, 1), 0.0) or
+               xt::isclose(xt::row(x, 1), 1.0) or
+               xt::isclose(xt::row(x, 2), 0.0) or
+               xt::isclose(xt::row(x, 2), 1.0);
       });
 
   // Find constrained dofs
-  const std::vector<std::int32_t> bdofs
-      = dolfinx::fem::locate_dofs_topological(*V, tdim - 1, bc_facets);
-    
+  const std::vector<std::int32_t> bdofs =
+      dolfinx::fem::locate_dofs_topological(*V, tdim - 1, bc_facets);
+
   std::cout << "Number of boundary dofs = " << bdofs.size() << std::endl;
 
   // Define boundary condition
@@ -119,6 +123,19 @@ int main(int argc, char **argv) {
           {}));
   auto Kc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Kc);
   tpetra_assemble(Kc_mat, *Kc, {bc});
+
+  std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
+                    const std::int32_t *, const PetscScalar *)>
+      Kc_set = [Kc_mat](std::int32_t nr, const std::int32_t *rows,
+                        std::int32_t nc, const std::int32_t *cols,
+                        const PetscScalar *data) -> int {
+    Teuchos::ArrayView<const int> col_view(cols, 1);
+    Teuchos::ArrayView<const PetscScalar> data_view(data, 1);
+    Kc_mat->replaceLocalValues(*rows, col_view, data_view);
+    return 0;
+  };
+
+  fem::set_diagonal(Kc_set, *V, {bc});
   Kc_mat->fillComplete();
 
   // Hcurl mass matrix
