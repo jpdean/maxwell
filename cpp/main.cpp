@@ -246,7 +246,6 @@ int main(int argc, char **argv) {
 
   Teuchos::RCP<Teuchos::ParameterList> MLList =
       Teuchos::getParametersFromXmlFile("maxwell_solver_settings.xml");
-      // Teuchos::getParametersFromXmlFile("Maxwell.xml");
   Teuchos::RCP<MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>>
       refMaxwell = rcp(
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
