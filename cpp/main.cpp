@@ -28,7 +28,9 @@
 void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
                                                     std::int64_t, Node>>
                          A_Tpetra,
-                     const fem::Form<PetscScalar> &form) {
+                     const fem::Form<PetscScalar> &form,
+                     std::vector<std::shared_ptr<const dolfinx::fem::DirichletBC<PetscScalar>>> bcs
+                     ) {
 
   std::vector<std::int64_t> global_cols; // temp for columns
   const std::shared_ptr<const fem::FunctionSpace> V = form.function_spaces()[0];
@@ -67,7 +69,7 @@ void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
         return 0;
       };
 
-  fem::assemble_matrix(tpetra_insert, form, {});
+  fem::assemble_matrix(tpetra_insert, form, bcs);
 }
 
 int main(int argc, char **argv) {
@@ -116,7 +118,7 @@ int main(int argc, char **argv) {
           std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
           {}));
   auto Kc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Kc);
-  tpetra_assemble(Kc_mat, *Kc);
+  tpetra_assemble(Kc_mat, *Kc, {bc});
   Kc_mat->fillComplete();
 
   // Hcurl mass matrix
@@ -126,7 +128,7 @@ int main(int argc, char **argv) {
           std::vector<std::shared_ptr<const fem::Function<PetscScalar>>>{}, {},
           {}));
   auto Mc_mat = create_tpetra_matrix<PetscScalar>(mesh->mpi_comm(), *Mc);
-  tpetra_assemble(Mc_mat, *Mc);
+  tpetra_assemble(Mc_mat, *Mc, {});
   Mc_mat->fillComplete();
 
   // Inverse lumped Hgrad mass matrix
