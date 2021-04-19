@@ -245,7 +245,8 @@ int main(int argc, char **argv) {
   auto A_coords = tpetra_to_xpetra(coords);
 
   Teuchos::RCP<Teuchos::ParameterList> MLList =
-      Teuchos::getParametersFromXmlFile("Maxwell.xml");
+      Teuchos::getParametersFromXmlFile("maxwell_solver_settings.xml");
+      // Teuchos::getParametersFromXmlFile("Maxwell.xml");
   Teuchos::RCP<MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>>
       refMaxwell = rcp(
           new MueLu::RefMaxwell<PetscScalar, std::int32_t, std::int64_t, Node>(
