@@ -81,7 +81,9 @@ int main(int argc, char **argv) {
   if (argc > 1)
     n = std::stoi(argv[1]);
 
-  std::cout << "Mesh = " << n << "x" << n << "x" << n << "\n";
+  const int rank = dolfinx::MPI::rank(MPI_COMM_WORLD);
+  if (rank == 0)
+    std::cout << "Mesh = " << n << "x" << n << "x" << n << "\n";
 
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
@@ -326,12 +328,13 @@ int main(int argc, char **argv) {
   t5.stop();
   int iters = solver->getNumIters();
   bool success = (iters < 500 && status == Belos::Converged);
-  if (success)
-    std::cout << "SUCCESS! Belos converged in " << iters << " iterations."
-              << std::endl;
-  else
-    std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
-
+  if (rank == 0) {
+    if (success)
+      std::cout << "SUCCESS! Belos converged in " << iters << " iterations."
+                << std::endl;
+    else
+      std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
+  }
   dolfinx::list_timings(MPI_COMM_WORLD, {dolfinx::TimingType::wall});
 
   // Copy solution to Function and write to file
