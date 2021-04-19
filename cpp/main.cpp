@@ -328,5 +328,18 @@ int main(int argc, char **argv) {
     std::cout << "FAILURE! Belos did not converge fast enough." << std::endl;
 
   dolfinx::list_timings(MPI_COMM_WORLD, {dolfinx::TimingType::wall});
+
+  // Copy solution to Function and write to file
+  // FIXME There is probably a much better way
+  auto x_func = std::make_shared<fem::Function<PetscScalar>>(V);
+  std::vector<PetscScalar>& x_func_vec = x_func->x()->mutable_array();
+  for(int i = 0; i< vec_size; i++)
+  {
+    x_func_vec[i] = x->getData(0)[i];
+  }
+
+  io::VTKFile file("x.pvd");
+  file.write(*x_func);
+
   return 0;
 }
