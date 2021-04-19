@@ -78,6 +78,11 @@ int main(int argc, char **argv) {
   common::subsystem::init_logging(argc, argv);
 
   std::size_t n = 20;
+  if (argc > 1)
+    n = std::stoi(argv[1]);
+
+  std::cout << "Mesh = " << n << "x" << n << "x" << n << "\n";
+
   std::shared_ptr<mesh::Mesh> mesh =
       std::make_shared<mesh::Mesh>(generation::BoxMesh::create(
           MPI_COMM_WORLD, {{{0.0, 0.0, 0.0}, {1.0, 1.0, 1.0}}}, {n, n, n},
