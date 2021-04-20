@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
           mesh::CellType::tetrahedron, mesh::GhostMode::none));
 
   // N1curl space for Kc and Mc
-  auto V = fem::create_functionspace(functionspace_form_maxwell_Mc, "A", mesh);
+  auto V = fem::create_functionspace(functionspace_form_maxwell_Mc, "E", mesh);
 
   // Lagrange space for Mg
   auto Q = fem::create_functionspace(functionspace_form_maxwell_Mg, "u", mesh);

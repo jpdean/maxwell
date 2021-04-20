@@ -1,4 +1,5 @@
-# TODO Rename A to u
+# See https://trilinos.github.io/pdfs/mueluguide.pdf p. 24 for problem
+# or Hiptmair2007
 
 coord_element = VectorElement("Lagrange", tetrahedron, 1)
 mesh = Mesh(coord_element)
@@ -6,21 +7,24 @@ mesh = Mesh(coord_element)
 Hcurl_element = FiniteElement("N1curl", tetrahedron, 1)
 Q = FunctionSpace(mesh, Hcurl_element)
 
-mu = 1.0
-tau = 1.0
-# T_0 = Coefficient(element)
+alpha = 1.0
+beta = 1.0
 
 x = SpatialCoordinate(mesh)
-u_exact = as_vector((sin(pi * x[1]) * sin(pi * x[2]),
-                     sin(pi * x[0]) * sin(pi * x[2]),
-                     sin(pi * x[0]) * sin(pi * x[1])))
-f = curl(curl(u_exact)) + u_exact
+# Real
+factor = 1.0
+# Complex
+# factor = 1.0 + 1.0j
+E_exact = factor * as_vector((sin(pi * x[1]) * sin(pi * x[2]),
+                              sin(pi * x[0]) * sin(pi * x[2]),
+                              sin(pi * x[0]) * sin(pi * x[1])))
+f = curl(alpha * curl(E_exact)) + beta * E_exact
 
-A = TrialFunction(Q)
+E = TrialFunction(Q)
 v = TestFunction(Q)
 
-Kc = inner(1 / mu * curl(A), curl(v)) * dx + tau * inner(A, v)*dx
-Mc = inner(A, v)*dx
+Kc = alpha * inner(curl(E), curl(v)) * dx + beta * inner(E, v) * dx
+Mc = inner(E, v) * dx
 L = inner(f, v) * dx
 
 Hgrad_element = FiniteElement("Lagrange", tetrahedron, 1)
