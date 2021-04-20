@@ -342,6 +342,7 @@ int main(int argc, char **argv) {
   auto x_func = std::make_shared<fem::Function<PetscScalar>>(V);
   std::vector<PetscScalar> &x_func_vec = x_func->x()->mutable_array();
   std::copy(x->getData(0).begin(), x->getData(0).end(), x_func_vec.begin());
+  dolfinx::la::scatter_fwd(*(x_func->x()));
 
   io::XDMFFile file(MPI_COMM_WORLD, "x.xdmf", "w");
   file.write_mesh(*mesh);
