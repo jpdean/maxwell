@@ -9,6 +9,7 @@
 #include <Tpetra_Core.hpp>
 #include <Tpetra_CrsMatrix.hpp>
 #include <dolfinx.h>
+#include <dolfinx/io/XDMFFile.h>
 
 #include <Xpetra_CrsMatrix.hpp>
 #include <Xpetra_CrsMatrixFactory.hpp>
@@ -341,8 +342,13 @@ int main(int argc, char **argv) {
   auto x_func = std::make_shared<fem::Function<PetscScalar>>(V);
   std::vector<PetscScalar> &x_func_vec = x_func->x()->mutable_array();
   std::copy(x->getData(0).begin(), x->getData(0).end(), x_func_vec.begin());
-  io::VTKFile file("x.pvd");
-  file.write(*x_func);
+
+  io::XDMFFile file(MPI_COMM_WORLD, "x.xdmf", "w");
+  file.write_mesh(*mesh);
+  file.write_function(*x_func, 0.0);
+
+  io::VTKFile vtkfile("x.pvd");
+  vtkfile.write(*x_func);
 
   return 0;
 }
