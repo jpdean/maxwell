@@ -10,7 +10,7 @@ from util import L2_norm
 # Problem
 create_problem = problems.create_problem_1
 # Characteristic element size
-hs = [1 / 4, 1 / 8, 1 / 12, 1 / 16]
+hs = [1 / 4, 1 / 8, 1 / 16, 1/32]
 # Polynomial orders
 ks = [1]
 # Permeability
@@ -21,11 +21,11 @@ for k in ks:
     l2_errors = []
     for h in hs:
         mesh, T_0, B_e = create_problem(h, mu)
-        A = solve_problem(mesh, k, mu, T_0)
-        B = compute_B(A, k - 1, mesh)
+        result = solve_problem(mesh, k, mu, T_0)
+        B = compute_B(result["A"], k - 1)
         e = L2_norm(B - B_e)
         l2_errors.append(e)
     results[k] = (hs, l2_errors)
-
+print(results)
 # Save results
 pickle.dump(results, open("convergence_results.p", "wb"))

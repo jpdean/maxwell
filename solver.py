@@ -6,48 +6,63 @@
 # TODO Solver currently assumes homogeneous Neumann BCs everywhere. Add
 # ability to use more complicated BCs
 
-from dolfinx import Function,  FunctionSpace, VectorFunctionSpace
-from ufl import TrialFunction, TestFunction, inner, dx, curl, as_vector
-from util import project
-from dolfinx.fem import assemble_matrix, assemble_vector
-from petsc4py import PETSc
-from dolfinx.cpp.fem import create_discrete_gradient
 import numpy as np
 from dolfinx.common import Timer
+from dolfinx.cpp.fem.petsc import create_discrete_gradient
+from dolfinx.fem import (Expression, Function, FunctionSpace,
+                         VectorFunctionSpace, form, petsc)
+from dolfinx.mesh import Mesh
+from petsc4py import PETSc
+from ufl import TestFunction, TrialFunction, as_vector, curl, dx, inner
+from ufl.core.expr import Expr
+from typing import Dict
+from util import project
 
 
-def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
+def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
+                  preconditioner: str = "ams", jit_params: Dict = None,
+                  form_compiler_params: Dict = None):
     """Solves a magnetostatic problem.
     Args:
         mesh: the mesh
         k: order of space
+        mu: Permability
         T_0: impressed magnetic field
         preconditioner: "ams" or "gamg"
+        form_compiler_params: See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
+        jit_params:See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
     Returns:
         A: Magnetic vector potential
         ndofs: number of degrees of freedom
         solve_time: time taked for solver alone
         iterations: number of solver iterations
     """
+    if form_compiler_params is None:
+        form_compiler_params = {}
+    if jit_params is None:
+        jit_params = {}
+
     V = FunctionSpace(mesh, ("N1curl", k))
 
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    a = inner(1 / mu * curl(A), curl(v)) * dx
+    a = form(inner(1 / mu * curl(A), curl(v)) * dx,
+             form_compiler_params=form_compiler_params, jit_params=jit_params)
 
-    L = inner(T_0, curl(v)) * dx
+    L = form(inner(T_0, curl(v)) * dx,
+             form_compiler_params=form_compiler_params, jit_params=jit_params)
 
     A = Function(V)
 
     # TODO More steps needed here for Dirichlet boundaries
-    mat = assemble_matrix(a)
+    mat = petsc.assemble_matrix(a)
     mat.assemble()
-    vec = assemble_vector(L)
+    vec = petsc.assemble_vector(L)
     vec.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
 
     # Create solver
-    ksp = PETSc.KSP().create(mesh.mpi_comm())
+    ksp = PETSc.KSP().create(mesh.comm)
 
     # Set solver options
     ksp.setType("cg")
@@ -60,8 +75,8 @@ def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
         pc.setHYPREType("ams")
 
         # Build discrete gradient
-        G = create_discrete_gradient(V._cpp_object,
-                                     FunctionSpace(mesh, ("CG", 1))._cpp_object)
+        V_CG = FunctionSpace(mesh, ("CG", k))._cpp_object
+        G = create_discrete_gradient(V._cpp_object, V_CG)
 
         # Attach discrete gradient to preconditioner
         pc.setHYPREDiscreteGradient(G)
@@ -96,8 +111,7 @@ def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
     t = Timer()
     t.start()
     ksp.solve(vec, A.vector)
-    A.vector.ghostUpdate(addv=PETSc.InsertMode.INSERT,
-                         mode=PETSc.ScatterMode.FORWARD)
+    A.x.scatter_forward()
     ksp.view()
     t.stop()
     return {"A": A,
@@ -106,16 +120,20 @@ def solve_problem(mesh, k, mu, T_0, preconditioner="ams"):
             "iterations": ksp.its}
 
 
-def compute_B(A, k, mesh):
-    """Computes the magnetic field.
+def compute_B(A: Function, k: int, jit_params: Dict = None,
+              form_compiler_params: Dict = None):
+    """Computes the magnetic field (using interpolation).
     Args:
         A: Magnetic vector potential
         k: Degree of DG space for B
-        mesh: The mesh
+        form_compiler_params: See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
+        jit_params:See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
     Returns:
         B: The magnetic flux density
     """
     # TODO Get k from A somehow and use k - 1 for degree of V
-    V = VectorFunctionSpace(mesh, ("DG", k))
-    B = project(curl(A), V)
+    V = VectorFunctionSpace(A.function_space.mesh, ("DG", k))
+    B = Function(V)
+    curl_A = Expression(curl(A), V.element.interpolation_points)
+    B.interpolate(curl_A)
     return B
