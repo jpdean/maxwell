@@ -4,7 +4,6 @@
 
 from problems import create_problem_1
 from solver import solve_problem
-import numpy as np
 import pickle
 
 # Space degree

@@ -2,7 +2,6 @@
 
 import plotly.graph_objects as go
 import pickle
-import numpy as np
 
 save_figs_to_file = False
 

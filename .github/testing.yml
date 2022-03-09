@@ -1,0 +1,28 @@
+name: Test Maxwell problem solver
+
+on:
+  # Trigger tests on push
+  push:
+    branches:
+      - "**"
+  schedule:
+    # '*' is a special character in YAML, so string must be quoted
+    - cron: "0 1 * * *"
+jobs:
+  build:
+    if: "!(contains(github.event.head_commit.message, '[ci skip]') || contains(github.event.head_commit.message, '[skip ci]'))"
+    runs-on: ubuntu-20.04
+    container: dolfinx/dolfinx
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Flake8 code
+        run: flake8 .
+      - name: Install dependencies
+        run: |
+          pip3 install tqdm
+      - name: Run test
+        run: |
+          python3 problems.py
+          python3 convergence.py
+          python3 iterations.py

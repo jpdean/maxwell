@@ -19,8 +19,8 @@ def create_problem_1(h: np.float64, mu: np.float64) -> Tuple[Mesh, Expr, Expr]:
         mu: Permability
 
     Returns:
-        Tuple with the mesh, the impressed magnetic field and the exact magnetic field.
-        The two last outputs are ufl-expressions.
+        Tuple with the mesh, the impressed magnetic field and the exact
+        magnetic field. The two last outputs are ufl-expressions.
     """
     n = int(round(1 / h))
     mesh = create_unit_cube(MPI.COMM_WORLD, n, n, n)
@@ -37,7 +37,7 @@ def create_problem_1(h: np.float64, mu: np.float64) -> Tuple[Mesh, Expr, Expr]:
 
 if __name__ == "__main__":
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--h", default=1./16, type=np.float64, dest="h",
+    parser.add_argument("--h", default=1. / 16, type=np.float64, dest="h",
                         help="Resolution of Mesh")
     parser.add_argument("--k", default=1, type=int, dest="k",
                         help="Degree of H(curl) function space")

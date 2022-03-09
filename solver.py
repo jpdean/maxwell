@@ -70,7 +70,7 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
 
     pc = ksp.getPC()
     if preconditioner == "ams":
-        # Based on: https://bitbucket.org/fenics-project/dolfin/src/master/python/demo/undocumented/curl-curl/demo_curl-curl.py
+        # Based on: https://bitbucket.org/fenics-project/dolfin/src/master/python/demo/undocumented/curl-curl/demo_curl-curl.py # noqa: E501
         pc.setType("hypre")
         pc.setHYPREType("ams")
 
