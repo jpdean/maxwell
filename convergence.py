@@ -22,7 +22,7 @@ for k in ks:
     for h in hs:
         mesh, T_0, B_e = create_problem(h, mu)
         result = solve_problem(mesh, k, mu, T_0)
-        B = compute_B(result["A"], k - 1)
+        B = compute_B(result["A"])
         e = L2_norm(B - B_e)
         l2_errors.append(e)
     results[k] = (hs, l2_errors)
