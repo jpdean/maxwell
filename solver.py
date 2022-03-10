@@ -9,8 +9,7 @@
 import numpy as np
 from dolfinx.common import Timer
 from dolfinx.cpp.fem.petsc import create_discrete_gradient
-from dolfinx.fem import (Expression, Function, FunctionSpace,
-                         VectorFunctionSpace, form, petsc)
+from dolfinx.fem import Expression, Function, FunctionSpace, form, petsc
 from dolfinx.mesh import Mesh
 from petsc4py import PETSc
 from ufl import TestFunction, TrialFunction, as_vector, curl, dx, inner
@@ -120,19 +119,16 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
             "iterations": ksp.its}
 
 
-def compute_B(A: Function, k: int, jit_params: Dict = None,
-              form_compiler_params: Dict = None):
+def compute_B(A: Function):
     """Computes the magnetic field (using interpolation).
     Args:
         A: Magnetic vector potential
-        k: Degree of DG space for B
-        form_compiler_params: See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
-        jit_params:See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
     Returns:
         B: The magnetic flux density
     """
-    # TODO Get k from A somehow and use k - 1 for degree of V
-    V = VectorFunctionSpace(A.function_space.mesh, ("DG", k))
+    mesh = A.function_space.mesh
+    k = A.function_space.ufl_element().degree()
+    V = FunctionSpace(mesh, ("RT", k))
     B = Function(V)
     curl_A = Expression(curl(A), V.element.interpolation_points)
     B.interpolate(curl_A)
