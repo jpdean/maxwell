@@ -6,7 +6,7 @@
 
 from sympy import symbols
 from sympy.vector import CoordSys3D, curl
-from sympy import sin, cos, pi, simplify
+from sympy import sin, pi, simplify
 
 
 R = CoordSys3D("R")

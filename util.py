@@ -1,9 +1,9 @@
-from dolfinx import Function
 import numpy as np
-from mpi4py import MPI
-from dolfinx.fem import assemble_scalar, LinearProblem
-from ufl import (TrialFunction, TestFunction, inner, dx)
+from dolfinx.fem import assemble_scalar, petsc, form
 from dolfinx.io import XDMFFile
+from mpi4py import MPI
+from ufl import TestFunction, TrialFunction, dx, inner
+from ufl.core.expr import Expr
 
 
 def project(f, V):
@@ -15,20 +15,22 @@ def project(f, V):
     a = inner(u, v) * dx
     L = inner(f, v) * dx
 
-    problem = LinearProblem(a, L, petsc_options={"ksp_type": "cg"})
+    problem = petsc.LinearProblem(a, L, petsc_options={"ksp_type": "cg"})
     u_h = problem.solve()
     return u_h
 
 
-def save_function(v, mesh, filename):
+def save_function(v, filename):
     """Save a function v to xdmf"""
-    with XDMFFile(MPI.COMM_WORLD, filename, "w") as f:
+    mesh = v.function_space.mesh
+    with XDMFFile(mesh.comm, filename, "w") as f:
         f.write_mesh(mesh)
         f.write_function(v)
 
 
-def L2_norm(v):
+def L2_norm(v: Expr):
     """Computes the L2-norm of v
     """
-    return np.sqrt(MPI.COMM_WORLD.allreduce(assemble_scalar(inner(v, v) * dx),
+    integral = form(inner(v, v) * dx)
+    return np.sqrt(MPI.COMM_WORLD.allreduce(assemble_scalar(integral),
                                             op=MPI.SUM))
