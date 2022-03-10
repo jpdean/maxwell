@@ -9,8 +9,7 @@
 import numpy as np
 from dolfinx.common import Timer
 from dolfinx.cpp.fem.petsc import create_discrete_gradient
-from dolfinx.fem import (Expression, Function, FunctionSpace,
-                         VectorFunctionSpace, form, petsc)
+from dolfinx.fem import Expression, Function, FunctionSpace, form, petsc
 from dolfinx.mesh import Mesh
 from petsc4py import PETSc
 from ufl import TestFunction, TrialFunction, as_vector, curl, dx, inner
