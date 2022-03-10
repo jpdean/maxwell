@@ -59,8 +59,8 @@ if __name__ == "__main__":
     A = results["A"]
     A.name = "A"
     save_function(A, "A.bp")
-    # B = compute_B(A, k - 1)
-    # B.name = "B"
-    # save_function(B, "B.xdmf")
-    # e = L2_norm(B - B_e)
-    # print(f"L2-norm of error in B = {e}")
+    B = compute_B(A)
+    B.name = "B"
+    save_function(B, "B.bp")
+    e = L2_norm(B - B_e)
+    print(f"L2-norm of error in B = {e}")
