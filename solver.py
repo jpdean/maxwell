@@ -3,6 +3,9 @@
 # conditions. This can be ensured by prescribing an impressed magnetic
 # field, see[2]
 
+# TODO Could construct alpha and beta poisson matrices and pass to AMS,
+# see [1] for details.
+
 # References:
 # [1] https://hypre.readthedocs.io/en/latest/solvers-ams.html
 # [2] Oszkar Biro, "Edge element formulations of eddy current problems"
