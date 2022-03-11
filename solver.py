@@ -9,8 +9,9 @@
 import numpy as np
 from dolfinx.common import Timer
 from dolfinx.cpp.fem.petsc import create_discrete_gradient
-from dolfinx.fem import Expression, Function, FunctionSpace, form, petsc
-from dolfinx.mesh import Mesh
+from dolfinx.fem import (Expression, Function, FunctionSpace, form, petsc,
+                         locate_dofs_topological, dirichletbc)
+from dolfinx.mesh import Mesh, locate_entities_boundary
 from petsc4py import PETSc
 from ufl import TestFunction, TrialFunction, as_vector, curl, dx, inner
 from ufl.core.expr import Expr
@@ -18,8 +19,9 @@ from typing import Dict
 from util import project
 
 
-def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
-                  preconditioner: str = "ams", jit_params: Dict = None,
+def solve_problem(mesh: Mesh, k: int, mu: np.float64, f: Expr,
+                  boundary_marker, A_bc_ufl, preconditioner: str = "ams",
+                  jit_params: Dict = None,
                   form_compiler_params: Dict = None):
     """Solves a magnetostatic problem.
     Args:
@@ -43,22 +45,37 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
 
     V = FunctionSpace(mesh, ("N1curl", k))
 
+    # TODO Rename?
     A = TrialFunction(V)
     v = TestFunction(V)
 
-    a = form(inner(1 / mu * curl(A), curl(v)) * dx,
+    a = form(inner(1 / mu * curl(A), curl(v)) * dx + inner(A, v) * dx,
              form_compiler_params=form_compiler_params, jit_params=jit_params)
 
-    L = form(inner(T_0, curl(v)) * dx,
+    # TODO Rename
+    L = form(inner(f, v) * dx,
              form_compiler_params=form_compiler_params, jit_params=jit_params)
 
     A = Function(V)
 
+    tdim = mesh.topology.dim
+    boundary_facets = locate_entities_boundary(
+        mesh, dim=tdim - 1, marker=boundary_marker)
+    boundary_dofs = locate_dofs_topological(
+        V, entity_dim=tdim - 1, entities=boundary_facets)
+    A_bc_expr = Expression(A_bc_ufl, V.element.interpolation_points)
+    A_bc = Function(V)
+    A_bc.interpolate(A_bc_expr)
+    bc = dirichletbc(A_bc, boundary_dofs)
+
     # TODO More steps needed here for Dirichlet boundaries
-    mat = petsc.assemble_matrix(a)
+    mat = petsc.assemble_matrix(a, bcs=[bc])
     mat.assemble()
     vec = petsc.assemble_vector(L)
-    vec.ghostUpdate(addv=PETSc.InsertMode.ADD, mode=PETSc.ScatterMode.REVERSE)
+    petsc.apply_lifting(vec, [a], bcs=[[bc]])
+    vec.ghostUpdate(addv=PETSc.InsertMode.ADD,
+                    mode=PETSc.ScatterMode.REVERSE)
+    petsc.set_bc(vec, [bc])
 
     # Create solver
     ksp = PETSc.KSP().create(mesh.comm)
@@ -90,7 +107,8 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, T_0: Expr,
 
         # We are dealing with a zero conductivity problem (no mass term), so
         # we need to tell the preconditioner
-        pc.setHYPRESetBetaPoissonMatrix(None)
+        # NOTE For zero conductivity, this must be set
+        # pc.setHYPRESetBetaPoissonMatrix(None)
 
         # Can set more amg options like:
         # opts = PETSc.Options()

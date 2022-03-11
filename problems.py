@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 from dolfinx.mesh import Mesh, create_unit_cube
 from mpi4py import MPI
-from ufl import SpatialCoordinate, as_vector, cos, pi
+from ufl import SpatialCoordinate, as_vector, cos, pi, curl
 from ufl.core.expr import Expr
 
 from solver import compute_B, solve_problem
@@ -25,14 +25,19 @@ def create_problem_1(h: np.float64, mu: np.float64) -> Tuple[Mesh, Expr, Expr]:
     n = int(round(1 / h))
     mesh = create_unit_cube(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
-    T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
-                     - pi * cos(x[0] * pi) / mu,
-                     - pi * cos(x[1] * pi) / mu))
-    # FIXME Get ufl to compute f and B from A for checking solution
-    B_e = as_vector((- pi * cos(x[2] * pi),
-                     - pi * cos(x[0] * pi),
-                     - pi * cos(x[1] * pi)))
-    return mesh, T_0, B_e
+    A_e = as_vector((cos(pi * x[1]), cos(pi * x[2]), cos(pi * x[0])))
+    f = curl(curl(A_e)) + A_e
+
+    def boundary_marker(x):
+        """Marker function for the boundary of a unit cube"""
+        # Collect boundaries perpendicular to each coordinate axis
+        boundaries = [
+            np.logical_or(np.isclose(x[i], 0.0), np.isclose(x[i], 1.0))
+            for i in range(3)]
+        return np.logical_or(np.logical_or(boundaries[0],
+                                           boundaries[1]),
+                             boundaries[2])
+    return mesh, A_e, f, boundary_marker
 
 
 if __name__ == "__main__":
@@ -53,14 +58,11 @@ if __name__ == "__main__":
     mu = args.mu
     prec = args.prec
 
-    mesh, T_0, B_e = create_problem_1(h, mu)
+    mesh, A_e, f, boundary_marker = create_problem_1(h, mu)
 
-    results = solve_problem(mesh, k, mu, T_0, prec)
+    results = solve_problem(mesh, k, mu, f, boundary_marker, A_e, prec)
     A = results["A"]
     A.name = "A"
     save_function(A, "A.bp")
-    B = compute_B(A)
-    B.name = "B"
-    save_function(B, "B.bp")
-    e = L2_norm(B - B_e)
-    print(f"L2-norm of error in B = {e}")
+    e = L2_norm(A - A_e)
+    print(f"L2-norm of error in A = {e}")
