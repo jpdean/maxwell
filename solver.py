@@ -97,13 +97,15 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, f: Expr,
         # Attach discrete gradient to preconditioner
         pc.setHYPREDiscreteGradient(G)
 
-        cvecs = []
-        for i in range(3):
-            direction = as_vector([1.0 if i == j else 0.0 for j in range(3)])
-            cvecs.append(project(direction, V))
-        pc.setHYPRESetEdgeConstantVectors(cvecs[0].vector,
-                                          cvecs[1].vector,
-                                          cvecs[2].vector)
+        cvec_0 = Function(V)
+        cvec_0.interpolate(lambda x: np.vstack((np.ones_like(x[0]), np.zeros_like(x[0]), np.zeros_like(x[0]))))
+        cvec_1 = Function(V)
+        cvec_1.interpolate(lambda x: np.vstack((np.zeros_like(x[0]), np.ones_like(x[0]), np.zeros_like(x[0]))))
+        cvec_2 = Function(V)
+        cvec_2.interpolate(lambda x: np.vstack((np.zeros_like(x[0]), np.zeros_like(x[0]), np.ones_like(x[0]))))
+        pc.setHYPRESetEdgeConstantVectors(cvec_0.vector,
+                                          cvec_1.vector,
+                                          cvec_2.vector)
 
         # We are dealing with a zero conductivity problem (no mass term), so
         # we need to tell the preconditioner
