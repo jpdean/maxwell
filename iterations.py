@@ -2,14 +2,15 @@
 # increasing size. The results are saved to iteration_results.p and can
 # be plotted with plot_iterations.py.
 
-from problems import create_problem_1
+from problems import create_problem_0
 from solver import solve_problem
 import pickle
 
 # Space degree
 k = 1
-# Permeability
-mu = 1
+# Coefficients
+alpha = 1.0
+beta = 1.0
 # Initial element diameter
 h = 1 / 4
 # Number of dofs ratio
@@ -21,8 +22,8 @@ ndofs = []
 times = []
 iters = []
 for i in range(n):
-    mesh, A_e, f, boundary_marker = create_problem_1(h, mu)
-    results = solve_problem(mesh, k, mu, f, boundary_marker, A_e)[1]
+    mesh, u_e, f, boundary_marker = create_problem_0(h, alpha, beta)
+    results = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e)[1]
 
     ndofs.append(results["ndofs"])
     times.append(results["solve_time"])
