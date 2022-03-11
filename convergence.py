@@ -20,12 +20,12 @@ results = {}
 for k in ks:
     l2_errors = []
     for h in hs:
-        mesh, T_0, B_e = create_problem(h, mu)
-        result = solve_problem(mesh, k, mu, T_0)
-        B = compute_B(result["A"])
-        e = L2_norm(B - B_e)
+        mesh, A_e, f, boundary_marker = create_problem(h, mu)
+        A = solve_problem(mesh, k, mu, f, boundary_marker, A_e)[0]
+        e = L2_norm(A - A_e)
         l2_errors.append(e)
     results[k] = (hs, l2_errors)
 print(results)
 # Save results
+# TODO Use JSON instead
 pickle.dump(results, open("convergence_results.p", "wb"))

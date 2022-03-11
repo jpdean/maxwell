@@ -132,10 +132,9 @@ def solve_problem(mesh: Mesh, k: int, mu: np.float64, f: Expr,
     A.x.scatter_forward()
     ksp.view()
     t.stop()
-    return {"A": A,
-            "ndofs": A.vector.getSize(),
-            "solve_time": t.elapsed()[0],
-            "iterations": ksp.its}
+    return (A, {"ndofs": A.vector.getSize(),
+                "solve_time": t.elapsed()[0],
+                "iterations": ksp.its})
 
 
 def compute_B(A: Function):

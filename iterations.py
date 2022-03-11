@@ -21,8 +21,8 @@ ndofs = []
 times = []
 iters = []
 for i in range(n):
-    mesh, T_0, B_e = create_problem_1(h, mu)
-    results = solve_problem(mesh, k, mu, T_0)
+    mesh, A_e, f, boundary_marker = create_problem_1(h, mu)
+    results = solve_problem(mesh, k, mu, f, boundary_marker, A_e)[1]
 
     ndofs.append(results["ndofs"])
     times.append(results["solve_time"])

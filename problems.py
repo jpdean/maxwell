@@ -60,8 +60,7 @@ if __name__ == "__main__":
 
     mesh, A_e, f, boundary_marker = create_problem_1(h, mu)
 
-    results = solve_problem(mesh, k, mu, f, boundary_marker, A_e, prec)
-    A = results["A"]
+    A = solve_problem(mesh, k, mu, f, boundary_marker, A_e, prec)[0]
     A.name = "A"
     save_function(A, "A.bp")
     e = L2_norm(A - A_e)
