@@ -7,7 +7,7 @@ from mpi4py import MPI
 from ufl import SpatialCoordinate, as_vector, cos, pi, curl
 from ufl.core.expr import Expr
 
-from solver import compute_B, solve_problem
+from solver import solve_problem
 from util import L2_norm, save_function
 
 

@@ -7,20 +7,6 @@ from ufl.core.expr import Expr
 from dolfinx.cpp.io import VTXWriter
 
 
-def project(f, V):
-    """Projects the function f onto the space V
-    """
-    u = TrialFunction(V)
-    v = TestFunction(V)
-
-    a = inner(u, v) * dx
-    L = inner(f, v) * dx
-
-    problem = petsc.LinearProblem(a, L, petsc_options={"ksp_type": "cg"})
-    u_h = problem.solve()
-    return u_h
-
-
 def save_function(v, filename):
     """Save a function v to xdmf"""
     mesh = v.function_space.mesh

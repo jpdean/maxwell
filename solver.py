@@ -13,10 +13,9 @@ from dolfinx.fem import (Expression, Function, FunctionSpace, form, petsc,
                          locate_dofs_topological, dirichletbc)
 from dolfinx.mesh import Mesh, locate_entities_boundary
 from petsc4py import PETSc
-from ufl import TestFunction, TrialFunction, as_vector, curl, dx, inner
+from ufl import TestFunction, TrialFunction, curl, dx, inner
 from ufl.core.expr import Expr
 from typing import Dict
-from util import project
 
 
 def solve_problem(mesh: Mesh, k: int, mu: np.float64, f: Expr,
