@@ -73,4 +73,4 @@ if __name__ == "__main__":
     u.name = "A"
     save_function(u, "u.bp")
     e = L2_norm(u - u_e)
-    print(f"||u - u_e||_L^2(\Omega) = {e}")
+    print(f"||u - u_e||_L^2(Omega) = {e}")
