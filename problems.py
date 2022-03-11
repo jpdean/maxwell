@@ -1,38 +1,49 @@
+# References:
+# [1] https://hypre.readthedocs.io/en/latest/solvers-ams.html
+
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
 from typing import Tuple
 
 import numpy as np
 from dolfinx.mesh import Mesh, create_unit_cube
 from mpi4py import MPI
-from ufl import SpatialCoordinate, as_vector, cos, pi
+from ufl import SpatialCoordinate, as_vector, cos, pi, curl
 from ufl.core.expr import Expr
 
-from solver import compute_B, solve_problem
+from solver import solve_problem
 from util import L2_norm, save_function
 
 
-def create_problem_1(h: np.float64, mu: np.float64) -> Tuple[Mesh, Expr, Expr]:
+def create_problem_0(h: np.float64,
+                     alpha: np.float64,
+                     beta: np.float64) -> Tuple[Mesh, Expr, Expr]:
     """Create setup for Maxwell problem
 
     Args:
         h: Diameter of cells in the mesh
-        mu: Permability
+        alpha: Coefficient (see [1])
+        beta: Coefficient (see [1])
 
     Returns:
-        Tuple with the mesh, the impressed magnetic field and the exact
-        magnetic field. The two last outputs are ufl-expressions.
+        Tuple containing the mesh, exact solution, right hand side, and
+        a marker for the boundary.
     """
     n = int(round(1 / h))
     mesh = create_unit_cube(MPI.COMM_WORLD, n, n, n)
     x = SpatialCoordinate(mesh)
-    T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
-                     - pi * cos(x[0] * pi) / mu,
-                     - pi * cos(x[1] * pi) / mu))
-    # FIXME Get ufl to compute f and B from A for checking solution
-    B_e = as_vector((- pi * cos(x[2] * pi),
-                     - pi * cos(x[0] * pi),
-                     - pi * cos(x[1] * pi)))
-    return mesh, T_0, B_e
+    u_e = as_vector((cos(pi * x[1]), cos(pi * x[2]), cos(pi * x[0])))
+    f = curl(curl(u_e)) + u_e
+
+    def boundary_marker(x):
+        """Marker function for the boundary of a unit cube"""
+        # Collect boundaries perpendicular to each coordinate axis
+        boundaries = [
+            np.logical_or(np.isclose(x[i], 0.0), np.isclose(x[i], 1.0))
+            for i in range(3)]
+        return np.logical_or(np.logical_or(boundaries[0],
+                                           boundaries[1]),
+                             boundaries[2])
+    return mesh, u_e, f, boundary_marker
 
 
 if __name__ == "__main__":
@@ -44,23 +55,22 @@ if __name__ == "__main__":
     parser.add_argument("--prec", default="ams", type=str, dest="prec",
                         help="Preconditioner used for solving the Maxwell problem",
                         choices=["ams", "gamg"])
-    parser.add_argument("--mu", default=1., type=np.float64, dest="mu",
-                        help="Permability")
+    parser.add_argument("--alpha", default=1., type=np.float64, dest="alpha",
+                        help="Alpha coefficient")
+    parser.add_argument("--beta", default=1., type=np.float64, dest="beta",
+                        help="Beta coefficient")
     args = parser.parse_args()
 
     k = args.k
     h = args.h
-    mu = args.mu
+    alpha = args.alpha
+    beta = args.beta
     prec = args.prec
 
-    mesh, T_0, B_e = create_problem_1(h, mu)
+    mesh, u_e, f, boundary_marker = create_problem_0(h, alpha, beta)
 
-    results = solve_problem(mesh, k, mu, T_0, prec)
-    A = results["A"]
-    A.name = "A"
-    save_function(A, "A.bp")
-    B = compute_B(A)
-    B.name = "B"
-    save_function(B, "B.bp")
-    e = L2_norm(B - B_e)
-    print(f"L2-norm of error in B = {e}")
+    u = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e, prec)[0]
+    u.name = "A"
+    save_function(u, "u.bp")
+    e = L2_norm(u - u_e)
+    print(f"||u - u_e||_L^2(Omega) = {e}")
