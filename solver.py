@@ -96,8 +96,8 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
 
         # Build discrete gradient
         V_CG = FunctionSpace(mesh, ("CG", k))._cpp_object
-        G = create_discrete_gradient(V._cpp_object, V_CG)
-
+        G = create_discrete_gradient(V_CG, V._cpp_object)
+        G.assemble()
         # Attach discrete gradient to preconditioner
         pc.setHYPREDiscreteGradient(G)
 
@@ -143,6 +143,6 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
     u.x.scatter_forward()
     ksp.view()
     t.stop()
-    return (u, {"ndofs": u.vector.getSize(),
+    return (u, {"ndofs": V.dofmap.index_map.size_global * V.dofmap.index_map_bs,
                 "solve_time": t.elapsed()[0],
                 "iterations": ksp.its})
