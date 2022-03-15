@@ -11,9 +11,9 @@ from util import L2_norm
 # Problem
 create_problem = problems.create_problem_0
 # Characteristic element size
-hs = [1 / 4, 1 / 8, 1 / 16, 1 / 32]  # 1 / 64]
+hs = [1 / 4, 1 / 8, 1 / 16]  # , 1 / 32, 1 / 64]
 # Polynomial orders
-ks = [1, 2]
+ks = [1, 2]  # , 3]
 # Coefficients
 alpha = 1.0
 beta = 1.0
