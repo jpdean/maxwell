@@ -10,16 +10,18 @@
 # [1] https://hypre.readthedocs.io/en/latest/solvers-ams.html
 # [2] Oszkar Biro, "Edge element formulations of eddy current problems"
 
+from typing import Dict
+from util import save_function
 import numpy as np
 from dolfinx.common import Timer
-from dolfinx.cpp.fem.petsc import create_discrete_gradient
-from dolfinx.fem import (Expression, Function, FunctionSpace, form, petsc,
-                         locate_dofs_topological, dirichletbc, Constant)
+from dolfinx.cpp.fem.petsc import (create_discrete_gradient,
+                                   create_interpolation_matrix)
+from dolfinx.fem import (Constant, Expression, Function, FunctionSpace,
+                         dirichletbc, form, locate_dofs_topological, petsc)
 from dolfinx.mesh import Mesh, locate_entities_boundary
 from petsc4py import PETSc
-from ufl import TestFunction, TrialFunction, curl, dx, inner
+from ufl import TestFunction, TrialFunction, VectorElement, curl, dx, inner
 from ufl.core.expr import Expr
-from typing import Dict
 
 
 def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
@@ -85,10 +87,12 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
     ksp = PETSc.KSP().create(mesh.comm)
 
     # Set solver options
-    ksp.setType("cg")
-    ksp.setTolerances(rtol=1.0e-8)
+    ksp.setType("gmres")
+    ksp.setTolerances(rtol=1.0e-7)
+    # ksp.setNormType(ksp.NormType.NORM_PRECONDITIONED)
 
     pc = ksp.getPC()
+    opts = PETSc.Options()
     if preconditioner == "ams":
         # Based on: https://bitbucket.org/fenics-project/dolfin/src/master/python/demo/undocumented/curl-curl/demo_curl-curl.py # noqa: E501
         pc.setType("hypre")
@@ -98,33 +102,55 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
         V_CG = FunctionSpace(mesh, ("CG", k))._cpp_object
         G = create_discrete_gradient(V_CG, V._cpp_object)
         G.assemble()
-        # Attach discrete gradient to preconditioner
         pc.setHYPREDiscreteGradient(G)
 
-        cvec_0 = Function(V)
-        cvec_0.interpolate(lambda x: np.vstack((np.ones_like(x[0]),
-                                                np.zeros_like(x[0]),
-                                                np.zeros_like(x[0]))))
-        cvec_1 = Function(V)
-        cvec_1.interpolate(lambda x: np.vstack((np.zeros_like(x[0]),
-                                                np.ones_like(x[0]),
-                                                np.zeros_like(x[0]))))
-        cvec_2 = Function(V)
-        cvec_2.interpolate(lambda x: np.vstack((np.zeros_like(x[0]),
-                                                np.zeros_like(x[0]),
-                                                np.ones_like(x[0]))))
-        pc.setHYPRESetEdgeConstantVectors(cvec_0.vector,
-                                          cvec_1.vector,
-                                          cvec_2.vector)
+        if k == 1:
+            cvec_0 = Function(V)
+            cvec_0.interpolate(lambda x: np.vstack((np.ones_like(x[0]),
+                                                    np.zeros_like(x[0]),
+                                                    np.zeros_like(x[0]))))
+            cvec_1 = Function(V)
+            cvec_1.interpolate(lambda x: np.vstack((np.zeros_like(x[0]),
+                                                    np.ones_like(x[0]),
+                                                    np.zeros_like(x[0]))))
+            cvec_2 = Function(V)
+            cvec_2.interpolate(lambda x: np.vstack((np.zeros_like(x[0]),
+                                                    np.zeros_like(x[0]),
+                                                    np.ones_like(x[0]))))
+            pc.setHYPRESetEdgeConstantVectors(cvec_0.vector,
+                                              cvec_1.vector,
+                                              cvec_2.vector)
+        else:
+            # Create interpolation operator
+            Vec_CG = FunctionSpace(mesh, VectorElement("CG", mesh.ufl_cell(), k))
+            Pi = create_interpolation_matrix(Vec_CG._cpp_object, V._cpp_object)
+            Pi.assemble()
+
+            u_ = Function(Vec_CG)
+
+            def f(x):
+                return (x[0]**k, x[2]**k, x[1]**k)
+            u_.interpolate(f)
+            w_vec = Function(V)
+            w_vec.interpolate(u_)
+            w_vec.x.scatter_forward()
+            # Compute global matrix vector product
+            w = Function(V)
+            Pi.mult(u_.vector, w.vector)
+            w.x.scatter_forward()
+            assert np.allclose(w_vec.x.array, w.x.array)
+
+            # Attach discrete gradient to preconditioner
+            pc.setHYPRESetInterpolations(mesh.geometry.dim, None, None, Pi, None)
 
         # If we are dealing with a zero conductivity problem (no mass
         # term),need to tell the preconditioner
         if np.isclose(beta.value, 0):
             pc.setHYPRESetBetaPoissonMatrix(None)
 
-        # NOTE Can set more ams options like:
-        # opts = PETSc.Options()
-        # opts["pc_hypre_ams_cycle_type"] = 13
+        # NOTE Can set more ams options like
+        opts["pc_hypre_ams_cycle_type"] = 7
+        #opts["pc_hypre_ams_tol"] = 1e-6
     elif preconditioner == "gamg":
         pc.setType("gamg")
 
@@ -133,13 +159,17 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
 
     ksp.setMonitor(lambda ksp, its, rnorm: print(
         "Iteration: {}, rel. residual: {}".format(its, rnorm)))
-
     ksp.setFromOptions()
-
     # Compute solution
     t = Timer()
     t.start()
     ksp.solve(b, u.vector)
+    reason = ksp.getConvergedReason()
+    print(f"Convergence reason {reason}")
+    if reason < 0:
+        u.name = "A"
+        save_function(u, "error.bp")
+        raise RuntimeError("Solver did not converge. Output at error.bp")
     u.x.scatter_forward()
     ksp.view()
     t.stop()
