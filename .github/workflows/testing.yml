@@ -68,7 +68,8 @@ jobs:
       - name: Get Basix
         uses: actions/checkout@v2
         with:
-          path: /tmp/basix
+          working-directory: /tmp/
+          path: ./basix
           repository: FEniCS/basix
           ref: main
 
@@ -83,7 +84,8 @@ jobs:
       - name: Get DOLFINx
         uses: actions/checkout@v2
         with:
-          path: /tmp/dolfinx
+          working-directory: /tmp/
+          path: ./dolfinx
           repository: FEniCS/dolfinx
           ref: main
 
