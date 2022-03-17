@@ -68,34 +68,34 @@ jobs:
       - name: Get Basix
         uses: actions/checkout@v2
         with:
-          path: ./basix
+          path: /tmp/basix
           repository: FEniCS/basix
           ref: main
 
       - name: Install UFL, Basix, FFCx
         run: |
-          cmake -G Ninja -B build-basix -DCMAKE_BUILD_TYPE="Release" -S ./basix/cpp/
+          cmake -G Ninja -B build-basix -DCMAKE_BUILD_TYPE="Release" -S /tmp/basix/cpp/
           cmake --build build-basix --parallel 3
           cmake --install build-basix
-          BUILD_TYPE="Release" pip3 install ./basix/python
+          BUILD_TYPE="Release" pip3 install /tmp/basix/python
           python3 -m pip install git+https://github.com/FEniCS/ufl.git
           python3 -m pip install git+https://github.com/FEniCS/ffcx.git
       - name: Get DOLFINx
         uses: actions/checkout@v2
         with:
-          path: ./dolfinx
+          path: /tmp/dolfinx
           repository: FEniCS/dolfinx
           ref: main
 
       - name: Configure C++ (dolfinx)
         run: |
-          cmake -G Ninja -DCMAKE_BUILD_TYPE="Release" -B build-dolfinx -S ./dolfinx/cpp/
+          cmake -G Ninja -DCMAKE_BUILD_TYPE="Release" -B build-dolfinx -S /tmp/dolfinx/cpp/
       - name: Build and install C++ library (dolfinx)
         run: |
           cmake --build build-dolfinx
           cmake --install build-dolfinx
       - name: Build Python interface (dolfinx)
-        run: BUILD_TYPE="Release" python3 -m pip -v install ./dolfinx/python/
+        run: BUILD_TYPE="Release" python3 -m pip -v install /tmp/dolfinx/python/
 
       - name: Flake8 code
         run: flake8 .
