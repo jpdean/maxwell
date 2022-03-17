@@ -85,7 +85,7 @@ jobs:
         with:
           path: ./dolfinx
           repository: FEniCS/dolfinx
-          ref: main
+          ref: dokken/discrete_interpolation_matrix
 
       - name: Configure C++ (dolfinx)
         run: |
