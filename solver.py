@@ -88,7 +88,7 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
 
     # Set solver options
     ksp.setType("gmres")
-    ksp.setTolerances(rtol=1.0e-7)
+    ksp.setTolerances(rtol=1.0e-8)
     # ksp.setNormType(ksp.NormType.NORM_PRECONDITIONED)
 
     pc = ksp.getPC()
@@ -125,20 +125,6 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
             Vec_CG = FunctionSpace(mesh, VectorElement("CG", mesh.ufl_cell(), k))
             Pi = create_interpolation_matrix(Vec_CG._cpp_object, V._cpp_object)
             Pi.assemble()
-
-            u_ = Function(Vec_CG)
-
-            def f(x):
-                return (x[0]**k, x[2]**k, x[1]**k)
-            u_.interpolate(f)
-            w_vec = Function(V)
-            w_vec.interpolate(u_)
-            w_vec.x.scatter_forward()
-            # Compute global matrix vector product
-            w = Function(V)
-            Pi.mult(u_.vector, w.vector)
-            w.x.scatter_forward()
-            assert np.allclose(w_vec.x.array, w.x.array)
 
             # Attach discrete gradient to preconditioner
             pc.setHYPRESetInterpolations(mesh.geometry.dim, None, None, Pi, None)
