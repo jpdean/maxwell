@@ -37,6 +37,7 @@ jobs:
       - name: Install custom PETSc
         working-directory: /tmp/
         run: |
+          apt-get update && apt-get install bison flex
           git clone https://gitlab.com/Dokken92/petsc.git
           cd petsc
           git checkout dokken/hypre-setinterpolations
