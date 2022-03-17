@@ -7,16 +7,24 @@ import pickle
 from solver import solve_problem
 import problems
 from util import L2_norm
+from dolfinx.common import list_timings, TimingType
+from mpi4py import MPI
 
 # Problem
 create_problem = problems.create_problem_0
 # Characteristic element size
-hs = [1 / 4, 1 / 8, 1 / 16]  # , 1 / 32, 1 / 64]
+hs = [1 / 4, 1 / 8]
 # Polynomial orders
-ks = [1, 2]  # , 3]
+ks = [1, 2, 3]
 # Coefficients
 alpha = 1.0
 beta = 1.0
+
+# Solver options
+petsc_options = {"pc_hypre_ams_cycle_type": 7,
+                 "pc_hypre_ams_tol": 1e-8,
+                 "ksp_atol": 1e-8, "ksp_rtol": 1e-8,
+                 "ksp_type": "gmres"}
 
 results = {k: [] for k in ks}
 iterations = {k: [] for k in ks}
@@ -25,7 +33,8 @@ ndofs = {k: [] for k in ks}
 for k in ks:
     for h in hs:
         mesh, u_e, f, boundary_marker = create_problem(h, alpha, beta)
-        u, info = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e)
+        u, info = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e,
+                                petsc_options=petsc_options)
         e = L2_norm(u - u_e)
         results[k].append(e)
         meshsize[k].append(h)
@@ -45,3 +54,5 @@ if mesh.comm.rank == 0:
 # Save results
 # TODO Use JSON instead
 pickle.dump(results, open("convergence_results.p", "wb"))
+
+list_timings(MPI.COMM_WORLD, [TimingType.wall])
