@@ -14,8 +14,8 @@ from typing import Dict
 from util import save_function
 import numpy as np
 from dolfinx.common import Timer, timing
-from dolfinx.cpp.fem.petsc import (create_discrete_gradient,
-                                   create_interpolation_matrix)
+from dolfinx.cpp.fem.petsc import (discrete_gradient,
+                                   interpolation_matrix)
 from dolfinx.fem import (Constant, Expression, Function, FunctionSpace,
                          dirichletbc, form, locate_dofs_topological, petsc)
 from dolfinx.mesh import Mesh, locate_entities_boundary
@@ -26,8 +26,8 @@ from ufl.core.expr import Expr
 
 def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
                   f: Expr, boundary_marker, u_bc_ufl,
-                  preconditioner: str = "ams", jit_params: Dict = None,
-                  form_compiler_params: Dict = None, petsc_options: Dict = None):
+                  preconditioner: str = "ams", jit_options: Dict = None,
+                  form_compiler_options: Dict = None, petsc_options: Dict = None):
     """Solves a magnetostatic problem.
     Args:
         mesh: the mesh
@@ -36,8 +36,8 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
         beta: Coefficient (see [1])
         f: impressed magnetic field
         preconditioner: "ams" or "gamg"
-        form_compiler_params: See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
-        jit_params:See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
+        form_compiler_options: See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
+        jit_options:See :func:`ffcx_jit <dolfinx.jit.ffcx_jit>`
         petsc_options: Parameters that is passed to the linear algebra backend
           PETSc. For available choices for the 'petsc_options' kwarg, see the `PETSc-documentation
           <https://petsc4py.readthedocs.io/en/stable/manual/ksp/>`
@@ -47,10 +47,10 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
          solve_time: time taked for solver alone
          iterations: number of solver iterations})
     """
-    if form_compiler_params is None:
-        form_compiler_params = {}
-    if jit_params is None:
-        jit_params = {}
+    if form_compiler_options is None:
+        form_compiler_options = {}
+    if jit_options is None:
+        jit_options = {}
     if petsc_options is None:
         petsc_options = {}
 
@@ -63,10 +63,10 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
     alpha = Constant(mesh, alpha)
     beta = Constant(mesh, beta)
     a = form(inner(alpha * curl(u), curl(v)) * dx + inner(beta * u, v) * dx,
-             form_compiler_params=form_compiler_params, jit_params=jit_params)
+             form_compiler_options=form_compiler_options, jit_options=jit_options)
 
     L = form(inner(f, v) * dx,
-             form_compiler_params=form_compiler_params, jit_params=jit_params)
+             form_compiler_options=form_compiler_options, jit_options=jit_options)
 
     u = Function(V)
 
@@ -75,7 +75,7 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
         mesh, dim=tdim - 1, marker=boundary_marker)
     boundary_dofs = locate_dofs_topological(
         V, entity_dim=tdim - 1, entities=boundary_facets)
-    u_bc_expr = Expression(u_bc_ufl, V.element.interpolation_points)
+    u_bc_expr = Expression(u_bc_ufl, V.element.interpolation_points())
     with Timer(f"~{k}, {ndofs}: BC interpolation"):
         u_bc = Function(V)
         u_bc.interpolate(u_bc_expr)
@@ -111,7 +111,7 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
         # Build discrete gradient
         with Timer(f"~{k}, {ndofs}: Build discrete gradient"):
             V_CG = FunctionSpace(mesh, ("CG", k))._cpp_object
-            G = create_discrete_gradient(V_CG, V._cpp_object)
+            G = discrete_gradient(V_CG, V._cpp_object)
             G.assemble()
             pc.setHYPREDiscreteGradient(G)
 
@@ -136,7 +136,7 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
             # Create interpolation operator
             with Timer(f"~{k}, {ndofs}: Build interpolation matrix"):
                 Vec_CG = FunctionSpace(mesh, VectorElement("CG", mesh.ufl_cell(), k))
-                Pi = create_interpolation_matrix(Vec_CG._cpp_object, V._cpp_object)
+                Pi = interpolation_matrix(Vec_CG._cpp_object, V._cpp_object)
                 Pi.assemble()
 
                 # Attach discrete gradient to preconditioner
