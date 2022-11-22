@@ -71,5 +71,5 @@ jobs:
 
       - name: Run test (higher order)
         run: |
-          python3 problems.py --k =2
+          python3 problems.py --k=2
  
