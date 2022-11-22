@@ -158,6 +158,9 @@ def solve_problem(mesh: Mesh, k: int, alpha: np.float64, beta: np.float64,
             print("Iteration: {}, rel. residual: {}".format(its, rnorm))
     ksp.setMonitor(monitor)
     ksp.setFromOptions()
+    pc.setUp()
+    ksp.setUp()
+
     # Compute solution
     with Timer(f"~{k}, {ndofs}: Solve Problem"):
         ksp.solve(b, u.vector)
