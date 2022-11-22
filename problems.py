@@ -68,8 +68,11 @@ if __name__ == "__main__":
     prec = args.prec
 
     mesh, u_e, f, boundary_marker = create_problem_0(h, alpha, beta)
-
-    u = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e, prec)[0]
+    petsc_options = {"pc_hypre_ams_cycle_type": 7,
+                     "pc_hypre_ams_tol": 1e-8,
+                     "ksp_atol": 1e-8, "ksp_rtol": 1e-8,
+                     "ksp_type": "gmres"}
+    u = solve_problem(mesh, k, alpha, beta, f, boundary_marker, u_e, prec, petsc_options=petsc_options)[0]
     u.name = "A"
     save_function(u, "u.bp")
     e = L2_norm(u - u_e)

@@ -68,8 +68,3 @@ jobs:
           python3 problems.py
           python3 convergence.py
           python3 iterations.py
-
-      - name: Run test (higher order)
-        run: |
-          python3 problems.py --k=2
- 

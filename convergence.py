@@ -15,13 +15,13 @@ create_problem = problems.create_problem_0
 # Characteristic element size
 hs = [1 / 4, 1 / 8]
 # Polynomial orders
-ks = [1, 2, 3]
+ks = [1, 2, 3, 4]
 # Coefficients
 alpha = 1.0
 beta = 1.0
 
 # Solver options
-petsc_options = {"pc_hypre_ams_cycle_type": 7,
+petsc_options = {"pc_hypre_ams_cycle_type": 1,
                  "pc_hypre_ams_tol": 1e-8,
                  "ksp_atol": 1e-8, "ksp_rtol": 1e-8,
                  "ksp_type": "gmres"}
