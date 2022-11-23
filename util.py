@@ -4,7 +4,7 @@ from dolfinx.fem import (assemble_scalar, form, VectorFunctionSpace,
 from mpi4py import MPI
 from ufl import dx, inner
 from ufl.core.expr import Expr
-from dolfinx.cpp.io import VTXWriter
+from dolfinx.io import VTXWriter
 
 
 def save_function(v, filename):
@@ -19,7 +19,7 @@ def save_function(v, filename):
     w = Function(W)
     w.name = v.name
     w.interpolate(v)
-    with VTXWriter(mesh.comm, filename, [w._cpp_object]) as file:
+    with VTXWriter(mesh.comm, filename, [w]) as file:
         file.write(0.0)
 
 
