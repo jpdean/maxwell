@@ -33,13 +33,13 @@ ninja -j8 -C build-dir-trilinos
 For real
 
 ```bash
-python3 -m ffcx --scalar_type=double maxwell.ufl
+python3 -m ffcx --scalar_type=double maxwell.py
 ```
 
 or for complex
 
 ```bash
-python3 -m ffcx --scalar_type="double complex" maxwell.ufl
+python3 -m ffcx --scalar_type="double complex" maxwell.py
 ```
 
 4. Compile deom
