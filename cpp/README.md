@@ -26,6 +26,7 @@ cmake -G Ninja -B build-dir-trilinos \
       -DTPL_ENABLE_Netcdf=OFF \
       .
 ninja -j8 -C build-dir-trilinos
+ninja -j8 -C build-dir-trilinos install
 
 ```
 

@@ -19,8 +19,8 @@ find_package(Trilinos REQUIRED)
 # Executable
 add_executable(${PROJECT_NAME} maxwell.c main.cpp)
  
-# Set C++17 standard
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_17)
+# Set C++20 standard
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${Trilinos_INCLUDE_DIRS})
 

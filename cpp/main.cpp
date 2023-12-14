@@ -1,7 +1,8 @@
 
 #include "lumping.h"
 #include "maxwell.h"
-#include "tpetra_util.h" #include < MatrixMarket_Tpetra.hpp>
+#include "tpetra_util.h"
+#include <MatrixMarket_Tpetra.hpp>
 #include <MueLu_CreateTpetraPreconditioner.hpp>
 #include <MueLu_RefMaxwell.hpp>
 #include <Tpetra_Core.hpp>
@@ -165,9 +166,12 @@ int main(int argc, char **argv)
   {
     common::Timer time_interpolate("Interpolate x");
     xcoord.interpolate(
-        [&j](const xt::xtensor<double, 2> &x) -> xt::xarray<double>
+        [&j](auto &x) -> std::pair<std::vector<double>, std::vector<std::size_t>>
         {
-          return xt::row(x, j);
+          std::vector<T> f(x.extent(1));
+          for (std::size_t p = 0; p < x.extent(1); ++p)
+            f[p] = x(j, p);
+          return {f, {f.size()}};
         });
     time_interpolate.stop();
     for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
@@ -256,7 +260,7 @@ int main(int argc, char **argv)
   dolfinx::la::Vector<PetscScalar> _b(V->dofmap()->index_map, 1);
   dolfinx::fem::assemble_vector(tcb::span<PetscScalar>(_b.mutable_array()),
                                 *Lform);
-  dolfinx::la::scatter_rev(_b, dolfinx::common::IndexMap::Mode::add);
+  _b.scatter_rev(dolfinx::common::IndexMap::Mode::add);
   std::copy(_b.array().begin(),
             _b.array().begin() + V->dofmap()->index_map->size_local(),
             b->getDataNonConst(0).get());
