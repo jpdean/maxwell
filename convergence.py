@@ -13,7 +13,7 @@ from mpi4py import MPI
 # Problem
 create_problem = problems.create_problem_0
 # Characteristic element size
-hs = [1 / 4, 1 / 8]
+hs = [1 / 2, 1 / 4, 1 / 8]
 # Polynomial orders
 ks = [1, 2, 3, 4]
 # Coefficients

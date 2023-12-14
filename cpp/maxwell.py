@@ -1,3 +1,19 @@
+from ufl import (
+    VectorElement,
+    FiniteElement,
+    Mesh,
+    SpatialCoordinate,
+    as_vector,
+    TrialFunction,
+    TestFunction,
+    inner,
+    curl,
+    dx,
+    FunctionSpace,
+    tetrahedron,
+    pi,
+    cos,
+)
 
 coord_element = VectorElement("Lagrange", tetrahedron, 1)
 mesh = Mesh(coord_element)
@@ -9,15 +25,15 @@ mu = 1.0
 # T_0 = Coefficient(element)
 
 x = SpatialCoordinate(mesh)
-T_0 = as_vector((- pi * cos(x[2] * pi) / mu,
-                 - pi * cos(x[0] * pi) / mu,
-                 - pi * cos(x[1] * pi) / mu))
+T_0 = as_vector(
+    (-pi * cos(x[2] * pi) / mu, -pi * cos(x[0] * pi) / mu, -pi * cos(x[1] * pi) / mu)
+)
 
 A = TrialFunction(Q)
 v = TestFunction(Q)
 
-Kc = inner(1 / mu * curl(A), curl(v)) * dx + 1e-8 * inner(A, v)*dx
-Mc = inner(A, v)*dx
+Kc = inner(1 / mu * curl(A), curl(v)) * dx + 1e-8 * inner(A, v) * dx
+Mc = inner(A, v) * dx
 L = inner(T_0, curl(v)) * dx
 
 Hgrad_element = FiniteElement("Lagrange", tetrahedron, 1)

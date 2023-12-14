@@ -1,9 +1,7 @@
 
 #include "lumping.h"
 #include "maxwell.h"
-#include "tpetra_util.h"
-
-#include <MatrixMarket_Tpetra.hpp>
+#include "tpetra_util.h" #include < MatrixMarket_Tpetra.hpp>
 #include <MueLu_CreateTpetraPreconditioner.hpp>
 #include <MueLu_RefMaxwell.hpp>
 #include <Tpetra_Core.hpp>
@@ -28,7 +26,8 @@
 void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
                                                     std::int64_t, Node>>
                          A_Tpetra,
-                     const fem::Form<PetscScalar> &form) {
+                     const fem::Form<PetscScalar> &form)
+{
 
   std::vector<std::int64_t> global_cols; // temp for columns
   const std::shared_ptr<const fem::FunctionSpace> V = form.function_spaces()[0];
@@ -41,36 +40,42 @@ void tpetra_assemble(Teuchos::RCP<Tpetra::CrsMatrix<PetscScalar, std::int32_t,
       tpetra_insert = [&A_Tpetra, &global_indices, &global_cols, &nlocalrows](
                           std::int32_t nr, const std::int32_t *rows,
                           const std::int32_t nc, const std::int32_t *cols,
-                          const PetscScalar *data) {
-        for (std::int32_t i = 0; i < nr; ++i) {
-          Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
-          if (rows[i] < nlocalrows) {
-            Teuchos::ArrayView<const int> col_view(cols, nc);
-            int nvalid =
-                A_Tpetra->sumIntoLocalValues(rows[i], col_view, data_view);
-            if (nvalid != nc)
-              throw std::runtime_error("Inserted " + std::to_string(nvalid) +
-                                       "/" + std::to_string(nc) + " on row:" +
-                                       std::to_string(global_indices[rows[i]]));
-          } else {
-            global_cols.resize(nc);
-            for (int j = 0; j < nc; ++j)
-              global_cols[j] = global_indices[cols[j]];
-            int nvalid = A_Tpetra->sumIntoGlobalValues(global_indices[rows[i]],
-                                                       global_cols, data_view);
-            if (nvalid != nc)
-              throw std::runtime_error("Inserted " + std::to_string(nvalid) +
-                                       "/" + std::to_string(nc) + " on row:" +
-                                       std::to_string(global_indices[rows[i]]));
-          }
-        }
-        return 0;
-      };
+                          const PetscScalar *data)
+  {
+    for (std::int32_t i = 0; i < nr; ++i)
+    {
+      Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
+      if (rows[i] < nlocalrows)
+      {
+        Teuchos::ArrayView<const int> col_view(cols, nc);
+        int nvalid =
+            A_Tpetra->sumIntoLocalValues(rows[i], col_view, data_view);
+        if (nvalid != nc)
+          throw std::runtime_error("Inserted " + std::to_string(nvalid) +
+                                   "/" + std::to_string(nc) + " on row:" +
+                                   std::to_string(global_indices[rows[i]]));
+      }
+      else
+      {
+        global_cols.resize(nc);
+        for (int j = 0; j < nc; ++j)
+          global_cols[j] = global_indices[cols[j]];
+        int nvalid = A_Tpetra->sumIntoGlobalValues(global_indices[rows[i]],
+                                                   global_cols, data_view);
+        if (nvalid != nc)
+          throw std::runtime_error("Inserted " + std::to_string(nvalid) +
+                                   "/" + std::to_string(nc) + " on row:" +
+                                   std::to_string(global_indices[rows[i]]));
+      }
+    }
+    return 0;
+  };
 
   fem::assemble_matrix(tpetra_insert, form, {});
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   common::subsystem::init_mpi(argc, argv);
   common::subsystem::init_logging(argc, argv);
 
@@ -121,7 +126,8 @@ int main(int argc, char **argv) {
       create_tpetra_diagonal_matrix<PetscScalar>(Q->dofmap()->index_map);
   std::vector<std::int32_t> col(1);
   std::vector<PetscScalar> val(1);
-  for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i) {
+  for (int i = 0; i < Q->dofmap()->index_map->size_local(); ++i)
+  {
     col[0] = i;
     val[0] = 1.0 / vals[i];
     Mg_mat->replaceLocalValues(i, col, val);
@@ -135,14 +141,16 @@ int main(int argc, char **argv) {
   std::function<int(std::int32_t, const std::int32_t *, std::int32_t,
                     const std::int32_t *, const PetscScalar *)>
       mat_set_dg = [&D0_mat](int nr, const int *rows, int nc, const int *cols,
-                             const PetscScalar *data) {
-        for (int i = 0; i < nr; ++i) {
-          Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
-          Teuchos::ArrayView<const int> col_view(cols, nc);
-          D0_mat->replaceLocalValues(rows[i], col_view, data_view);
-        }
-        return 0;
-      };
+                             const PetscScalar *data)
+  {
+    for (int i = 0; i < nr; ++i)
+    {
+      Teuchos::ArrayView<const PetscScalar> data_view(data + i * nc, nc);
+      Teuchos::ArrayView<const int> col_view(cols, nc);
+      D0_mat->replaceLocalValues(rows[i], col_view, data_view);
+    }
+    return 0;
+  };
 
   fem::assemble_discrete_gradient(mat_set_dg, *V, *Q);
   D0_mat->fillComplete();
@@ -153,10 +161,12 @@ int main(int argc, char **argv) {
           new Tpetra::MultiVector<double, std::int32_t, std::int64_t, Node>(
               Mg_mat->getRowMap(), 3));
   fem::Function<double> xcoord(Q);
-  for (int j = 0; j < 3; ++j) {
+  for (int j = 0; j < 3; ++j)
+  {
     common::Timer time_interpolate("Interpolate x");
     xcoord.interpolate(
-        [&j](const xt::xtensor<double, 2> &x) -> xt::xarray<double> {
+        [&j](const xt::xtensor<double, 2> &x) -> xt::xarray<double>
+        {
           return xt::row(x, j);
         });
     time_interpolate.stop();
@@ -168,7 +178,8 @@ int main(int argc, char **argv) {
 
   bool write_files = false;
 
-  if (write_files) {
+  if (write_files)
+  {
     common::Timer tw("Tpetra: write files");
     Tpetra::MatrixMarket::Writer<
         Tpetra::CrsMatrix<PetscScalar, std::int32_t, std::int64_t, Node>>::
