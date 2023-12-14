@@ -14,8 +14,7 @@ jobs:
   build:
     runs-on:
       ubuntu-latest
-    container: fenicsproject/test-env:v0.6.0-r1-mpich
-
+    container: ghcr.io/fenics/test-env:v0.7.2-mpich
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +24,7 @@ jobs:
         with:
           path: ./basix
           repository: FEniCS/basix
-          ref: v0.6.0
+          ref: v0.7.0
 
       - name: Install UFL, Basix, FFCx
         run: |
@@ -33,15 +32,15 @@ jobs:
           cmake --build build-basix --parallel 3
           cmake --install build-basix
           BUILD_TYPE="Release" pip3 install ./basix/python
-          python3 -m pip install git+https://github.com/FEniCS/ufl.git@2023.1.1.post0
-          python3 -m pip install git+https://github.com/FEniCS/ffcx.git@v0.6.0
+          python3 -m pip install git+https://github.com/FEniCS/ufl.git@2023.2.0
+          python3 -m pip install git+https://github.com/FEniCS/ffcx.git@v0.7.0
 
       - name: Get DOLFINx
         uses: actions/checkout@v4
         with:
           path: ./dolfinx
           repository: FEniCS/dolfinx
-          ref: v0.6.0
+          ref: v0.7.2
 
       - name: Configure C++ (dolfinx)
         run: |
