@@ -9,7 +9,7 @@ on:
     # '*' is a special character in YAML, so string must be quoted
     - cron: "0 1 * * *"
 env:
-  PETSC_ARCH: linux-gnu-real-32
+  PETSC_ARCH: linux-gnu-real64-32
 jobs:
   build:
     runs-on:
