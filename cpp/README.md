@@ -45,6 +45,6 @@ python3 -m ffcx --scalar_type="double complex" maxwell.py
 4. Compile demo
 
 ```bash
-cmake -G Ninja -B build-dir -DCMAKE_BUILD_TYPE=DEbug -DCMAKE_CXX_FLAGS="-fmax-errors=1"
+cmake -G Ninja -B build-dir -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="-fmax-errors=1"
 ninja -j8 -C build-dir
 ```
