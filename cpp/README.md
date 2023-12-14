@@ -42,7 +42,7 @@ or for complex
 python3 -m ffcx --scalar_type="double complex" maxwell.py
 ```
 
-4. Compile deom
+4. Compile demo
 
 ```bash
 cmake -G Ninja -B build-dir -DCMAKE_BUILD_TYPE=DEbug -DCMAKE_CXX_FLAGS="-fmax-errors=1"
