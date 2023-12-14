@@ -8,11 +8,11 @@ and [Trilinos](https://github.com/trilinos/Trilinos.git)  (an example build scri
 ```bash
 git clone https://github.com/trilinos/Trilinos.git
 cd Trilinos
-git checkout trilinos-release-13-0-1
+git checkout trilinos-release-13-4-1
 ```
 2. Buld trilinos
 ```bash
-cmake -B build-dir-trilinos \
+cmake -G Ninja -B build-dir-trilinos \
       -DTPL_ENABLE_MPI=ON \
       -DMPI_BASE_DIR=/usr/x86_64-linux/ \
       -DTrilinos_ENABLE_COMPLEX_DOUBLE=ON \
@@ -25,8 +25,8 @@ cmake -B build-dir-trilinos \
       -DTrilinos_ENABLE_PyTrilinos=OFF \
       -DTPL_ENABLE_Netcdf=OFF \
       .
-cd build-dir-trilinos
-make -j 2 install
+ninja -j8 -C build-dir-trilinos
+
 ```
 
 3. Compile integration kernels
@@ -45,6 +45,6 @@ python3 -m ffcx --scalar_type="double complex" maxwell.ufl
 4. Compile deom
 
 ```bash
-cmake .
-make
+cmake -G Ninja -B build-dir -DCMAKE_BUILD_TYPE=DEbug -DCMAKE_CXX_FLAGS="-fmax-errors=1"
+ninja -j8 -C build-dir
 ```

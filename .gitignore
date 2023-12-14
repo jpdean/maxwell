@@ -1,0 +1,4 @@
+**/*build-dir*/**
+__pycache__
+*.egg-info
+*.bp

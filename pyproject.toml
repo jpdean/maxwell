@@ -3,14 +3,14 @@ requires = ["setuptools>=64.4.0", "wheel", "pip>=22.3"]
 
 [project]
 name = "maxwell_problems"
-version = "0.6.0"
+version = "0.7.0"
 description = "Implementation for solving Maxwell-problems with DOLFINx"
 authors = [
       { name = "Joseph P. Dean", email="jpd62@eng.cam.ac.uk"},
       { name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
 license = { file = "LICENSE" }
 readme = "README.md"
-dependencies = ["fenics-dolfinx>=0.6.0"]
+dependencies = ["fenics-dolfinx>=0.7.0"]
 
 [tool.setuptools]
 packages = []

@@ -1,3 +1,4 @@
+from ufl import VectorElement, FiniteElement, Mesh, Coefficient, SpatialCoordinate, as_vector, TrialFunction, TestFunction, inner, curl, dx, FunctionSpace, tetrahedron, pi, cos
 
 coord_element = VectorElement("Lagrange", tetrahedron, 1)
 mesh = Mesh(coord_element)
