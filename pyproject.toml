@@ -1,0 +1,32 @@
+[build-system] # Require setuptool version due to https://github.com/pypa/setuptools/issues/2938
+requires = ["setuptools>=64.4.0", "wheel", "pip>=22.3"]
+
+[project]
+name = "maxwell_problems"
+version = "0.6.0"
+description = "Implementation for solving Maxwell-problems with DOLFINx"
+authors = [
+      { name = "Joseph P. Dean", email="jpd62@eng.cam.ac.uk"},
+      { name = "Jørgen S. Dokken", email = "dokken@simula.no" }]
+license = { file = "LICENSE" }
+readme = "README.md"
+dependencies = ["fenics-dolfinx>=0.6.0"]
+
+[tool.setuptools]
+packages = []
+
+[project.optional-dependencies]
+test = ["pytest", "coverage"]
+dev = ["pdbpp", "ipython", "mypy", "flake8"]
+all = ["adios4dolfinx[test,dev]"]
+
+[tool.pytest.ini_options]
+addopts = ["--import-mode=importlib"]
+testpaths = ["tests"]
+
+[tool.mypy]
+ignore_missing_imports = true
+# Folders to exclude
+exclude = ["build/"]
+# Folder to check with mypy
+files = ["src", "tests"]
